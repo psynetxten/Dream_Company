@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================
+   신문 전용 스타일
+   ============================ */
+
+@layer base {
+  :root {
+    --newsprint-bg: #fafaf7;
+    --ink-primary: #1a1a2e;
+    --ink-muted: #4a4a5a;
+    --border-color: #c8c8a0;
+  }
+
+  body {
+    font-family: 'Noto Serif KR', Georgia, serif;
+    background-color: var(--newsprint-bg);
+    color: var(--ink-primary);
+  }
+}
+
+@layer components {
+  /* 신문 전체 레이아웃 */
+  .newspaper-page {
+    @apply max-w-4xl mx-auto bg-newsprint-100 shadow-2xl;
+    border: 1px solid var(--border-color);
+    background-image:
+      linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* 신문 헤더 */
+  .newspaper-masthead {
+    @apply text-center py-6 border-b-4 border-ink;
+    border-top: 8px solid var(--ink-primary);
+  }
+
+  .newspaper-title {
+    @apply font-headline text-5xl font-bold tracking-widest;
+    letter-spacing: 0.15em;
+  }
+
+  .newspaper-date-line {
+    @apply flex justify-between items-center text-sm mt-2 px-4;
+    font-variant: small-caps;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 4px 16px;
+  }
+
+  /* 헤드라인 */
+  .news-headline {
+    @apply font-headline text-4xl font-bold leading-tight mb-2;
+    line-height: 1.1;
+  }
+
+  .news-subhead {
+    @apply text-xl font-medium text-ink-muted mb-4;
+    font-style: italic;
+  }
+
+  /* 기사 본문 */
+  .news-body {
+    @apply text-base leading-relaxed;
+    column-count: 2;
+    column-gap: 2rem;
+    column-rule: 1px solid var(--border-color);
+  }
+
+  .news-body p {
+    @apply mb-3;
+    text-align: justify;
+    text-indent: 1.5em;
+  }
+
+  .news-body p:first-child {
+    text-indent: 0;
+  }
+
+  /* 리드 문단 (초기 볼드) */
+  .news-lead {
+    @apply text-base font-semibold mb-4 leading-relaxed;
+    border-left: 4px solid var(--ink-primary);
+    padding-left: 1rem;
+  }
+
+  /* 사이드바 */
+  .news-sidebar {
+    @apply bg-newsprint-200 p-4 border border-ink-light;
+  }
+
+  .news-quote {
+    @apply text-lg italic font-medium;
+    quotes: '"' '"' "'" "'";
+  }
+
+  .news-quote::before {
+    content: open-quote;
+    @apply text-4xl text-ink-muted mr-1;
+    line-height: 0;
+    vertical-align: -0.4em;
+  }
+
+  /* 구분선 장식 */
+  .news-divider {
+    @apply my-4 border-none;
+    border-top: 3px double var(--border-color);
+  }
+
+  /* 광고/스폰서 영역 */
+  .sponsor-banner {
+    @apply border-2 border-ink p-3 text-center;
+    background: linear-gradient(135deg, #f5f5ef 0%, #e8e8d8 100%);
+  }
+
+  /* 페이지 번호 & 하단 */
+  .newspaper-footer {
+    @apply flex justify-between items-center py-2 px-4 text-xs;
+    border-top: 2px solid var(--ink-primary);
+    font-variant: small-caps;
+  }
+}
+
+/* 신문 페이지 인쇄 스타일 */
+@media print {
+  .newspaper-page {
+    max-width: 100%;
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  # ============================
+  # PostgreSQL 16
+  # ============================
+  postgres:
+    image: postgres:16-alpine
+    container_name: dream_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dream}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dream_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-dream_newspaper}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dream}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================
+  # ChromaDB (벡터 DB)
+  # ============================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: dream_chromadb
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "8001:8000"
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+    restart: unless-stopped
+
+  # ============================
+  # FastAPI 백엔드
+  # ============================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    container_name: dream_backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dream}:${POSTGRES_PASSWORD:-dream_secret}@postgres:5432/${POSTGRES_DB:-dream_newspaper}
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
+
+  # ============================
+  # Next.js 프론트엔드
+  # ============================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    container_name: dream_frontend
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: dream_postgres_data
+  chroma_data:
+    name: dream_chroma_data
+
+networks:
+  default:
+    name: dream_network
