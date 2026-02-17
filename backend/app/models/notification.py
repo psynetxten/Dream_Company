@@ -22,7 +22,7 @@ class Notification(Base):
 
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    meta_data: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
 
     channel: Mapped[str] = mapped_column(
         String(20), nullable=False, default="email"

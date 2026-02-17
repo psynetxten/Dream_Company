@@ -8,6 +8,34 @@ from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenRespons
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.core.exceptions import raise_conflict, raise_unauthorized
 from app.config import settings
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.core.security import decode_access_token
+
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """JWT 토큰에서 현재 사용자 추출"""
+    token = credentials.credentials
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise_unauthorized()
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise_unauthorized()
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user or not user.is_active:
+        raise_unauthorized()
+
+    return user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -58,36 +86,3 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """내 정보 조회"""
     return current_user
-
-
-# ============================
-# 의존성: 현재 사용자
-# ============================
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.core.security import decode_access_token
-
-security = HTTPBearer()
-
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """JWT 토큰에서 현재 사용자 추출"""
-    token = credentials.credentials
-    payload = decode_access_token(token)
-
-    if not payload:
-        raise_unauthorized()
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise_unauthorized()
-
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-
-    if not user or not user.is_active:
-        raise_unauthorized()
-
-    return user
