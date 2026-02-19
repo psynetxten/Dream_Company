@@ -26,7 +26,9 @@ export default function LoginPage() {
 
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "로그인에 실패했습니다.");
+      console.error("Login Error:", err);
+      const message = err.error_description || err.message || "로그인에 실패했습니다.";
+      setError(message);
     } finally {
       setLoading(false);
     }
