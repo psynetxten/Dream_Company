@@ -77,19 +77,15 @@ async def process_single_schedule(
                 "publish_time": str(order.publish_time),
             }
 
-            # 신문 생성 (동기 함수를 비동기 컨텍스트에서 실행)
+            # 신문 생성
             scheduled_date = schedule.scheduled_at.astimezone(ZoneInfo(order.timezone))
 
-            loop = asyncio.get_event_loop()
-            newspaper_content = await loop.run_in_executor(
-                None,
-                lambda: orchestrator.generate_single_newspaper(
-                    order=order_dict,
-                    episode=schedule.episode_number,
-                    scheduled_date=scheduled_date,
-                    sponsor_company=sponsor_company,
-                    previous_summary=previous_summary,
-                ),
+            newspaper_content = await orchestrator.generate_single_newspaper(
+                order=order_dict,
+                episode=schedule.episode_number,
+                scheduled_date=scheduled_date,
+                sponsor_company=sponsor_company,
+                previous_summary=previous_summary,
             )
 
             # DB에 신문 저장
@@ -115,6 +111,8 @@ async def process_single_schedule(
                 ai_model=newspaper_content.get("ai_model"),
                 generation_ms=newspaper_content.get("generation_ms"),
                 token_count=newspaper_content.get("token_count"),
+                sns_copy=newspaper_content.get("sns_copy", {}),
+                visual_prompt=newspaper_content.get("visual_prompt"),
                 status="published",
                 published_at=datetime.now(timezone.utc),
                 scheduled_at=schedule.scheduled_at,

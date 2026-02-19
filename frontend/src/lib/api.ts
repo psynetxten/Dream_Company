@@ -1,5 +1,5 @@
 import axios from "axios";
-import Cookies from "js-cookie";
+import { supabase } from "./supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -8,11 +8,11 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// 요청 인터셉터: JWT 토큰 자동 삽입
-api.interceptors.request.use((config) => {
-  const token = Cookies.get("access_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// 요청 인터셉터: Supabase 세션 토큰 자동 삽입
+api.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
   return config;
 });
@@ -20,9 +20,9 @@ api.interceptors.request.use((config) => {
 // 응답 인터셉터: 401 처리
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      Cookies.remove("access_token");
+      await supabase.auth.signOut();
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -106,4 +106,7 @@ export interface Newspaper {
   status: string;
   published_at?: string;
   view_count: number;
+  visual_prompt?: string;
+  sns_copy?: any;
+  ai_model?: string;
 }

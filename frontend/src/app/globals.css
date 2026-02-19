@@ -12,24 +12,63 @@
     --ink-primary: #1a1a2e;
     --ink-muted: #4a4a5a;
     --border-color: #c8c8a0;
+
+    /* AI Pro Theme (ComfyUI Inspired) */
+    --pro-bg: #0b0b0f;
+    --pro-surface: #16161d;
+    --pro-accent: #3a86ff;
+    --pro-border: #2d2d3a;
+    --pro-text: #e0e0e6;
+    --pro-text-muted: #8e8e9a;
+    --pro-node-bg: #1e1e26;
   }
 
   body {
     font-family: 'Noto Serif KR', Georgia, serif;
     background-color: var(--newsprint-bg);
     color: var(--ink-primary);
+    transition: background-color 0.3s ease;
+  }
+
+  body.pro-dark {
+    background-color: var(--pro-bg);
+    color: var(--pro-text);
   }
 }
 
 @layer components {
-  /* 신문 전체 레이아웃 */
+  /* AI-Native Nodes */
+  .workflow-node {
+    @apply border border-pro-border bg-pro-node-bg p-3 rounded-lg shadow-lg relative;
+    min-width: 140px;
+  }
+
+  .node-connector {
+    @apply absolute top-1/2 -right-4 w-4 h-0.5 bg-pro-accent;
+  }
+
+  .node-label {
+    @apply text-[10px] uppercase tracking-tighter text-pro-text-muted mb-1 font-mono;
+  }
+
+  .node-title {
+    @apply text-xs font-bold text-pro-text;
+  }
+
+  .ai-pro-card {
+    @apply bg-pro-surface border border-pro-border rounded-xl overflow-hidden shadow-2xl;
+  }
+
+  /* 신문 전체 레이아웃 (AI-Pro 대응) */
   .newspaper-page {
-    @apply max-w-4xl mx-auto bg-newsprint-100 shadow-2xl;
+    @apply max-w-4xl mx-auto bg-newsprint-100 shadow-2xl transition-all duration-500;
     border: 1px solid var(--border-color);
-    background-image:
-      linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
-    background-size: 20px 20px;
+  }
+
+  body.pro-dark .newspaper-page {
+    @apply bg-pro-surface border-pro-border;
+    background-image: none;
+    box-shadow: 0 0 50px rgba(0,0,0,0.5);
   }
 
   /* 신문 헤더 */

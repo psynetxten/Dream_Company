@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Cookies from "js-cookie";
-import { authApi } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -22,17 +21,27 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      await authApi.register(form);
-      // 자동 로그인
-      const loginRes = await authApi.login({
+      // Supabase 회원가입
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
+        options: {
+          data: {
+            full_name: form.full_name,
+          },
+        },
       });
-      Cookies.set("access_token", loginRes.data.access_token, { expires: 1 });
-      router.push("/order/new");
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || "회원가입에 실패했습니다.");
+
+      if (signUpError) throw signUpError;
+
+      if (data.user) {
+        // 만약 이메일 확인이 필요없다면 바로 로그인 처리
+        // 보통 Supabase 설정에서 "Confirm email"이 켜져있으면 바로 로그인 안됨
+        alert("회원가입이 완료되었습니다. 이메일을 확인하거나 로그인해주세요.");
+        router.push("/login");
+      }
+    } catch (err: any) {
+      setError(err.message || "회원가입에 실패했습니다.");
     } finally {
       setLoading(false);
     }

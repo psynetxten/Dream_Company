@@ -13,11 +13,21 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # 소셜 로그인 유저는 비밀번호가 없을 수 있음
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(
         String(20), nullable=False, default="user", index=True
     )  # user | writer | sponsor | admin
+
+    # 소셜 로그인 제공자 정보
+    oauth_provider: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True) # kakao | google | naver
+    oauth_provider_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    # 멀티테넌시(Sponsor)를 위한 조직 ID
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -46,4 +56,7 @@ class User(Base):
     )
     sponsor: Mapped["Sponsor | None"] = relationship(  # noqa: F821
         "Sponsor", back_populates="user", uselist=False
+    )
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )

@@ -6,6 +6,7 @@ from app.models.writer import WriterProfile
 from app.models.schedule import PublicationSchedule
 from app.models.agent_log import AgentLog
 from app.models.notification import Notification
+from app.models.refresh_token import RefreshToken
 
 __all__ = [
     "User",
@@ -17,4 +18,5 @@ __all__ = [
     "PublicationSchedule",
     "AgentLog",
     "Notification",
+    "RefreshToken",
 ]

@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo
 from app.agents.base_agent import BaseAgent
 from app.agents.writer.writer_agent import WriterAgent
 from app.agents.sponsor_matcher.sponsor_agent import SponsorMatcherAgent
+from app.agents.marketing_expert.agent import MarketingExpert
+from app.agents.content_producer.agent import ContentProducer
 from app.agents.orchestrator.prompts import ORCHESTRATOR_SYSTEM_PROMPT
 from app.config import settings
 import structlog
@@ -28,6 +30,8 @@ class OrchestratorAgent(BaseAgent):
         )
         self.writer_agent = WriterAgent()
         self.sponsor_agent = SponsorMatcherAgent()
+        self.marketing_expert = MarketingExpert()  # 마케팅 팀장
+        self.content_producer = ContentProducer()  # 콘텐츠 디렉터
 
     def process_new_order(self, order: dict) -> dict:
         """
@@ -76,7 +80,7 @@ class OrchestratorAgent(BaseAgent):
             "status": "active",
         }
 
-    def generate_single_newspaper(
+    async def generate_single_newspaper(
         self,
         order: dict,
         episode: int,
@@ -125,12 +129,20 @@ class OrchestratorAgent(BaseAgent):
         # 연속성을 위한 요약 생성
         summary = self.writer_agent.summarize_episode(newspaper_content)
 
+        # [마케팅 팀장] SNS 홍보 문구 생성
+        full_text = f"{newspaper_content.get('headline')}\n{newspaper_content.get('body_content')}"
+        
+        sns_copy = await self.marketing_expert.generate_sns_copy(full_text)
+        visual_prompt = await self.content_producer.generate_visual_prompt(full_text)
+
         return {
             **newspaper_content,
             "episode_number": episode,
             "future_date": future_date.date(),
             "future_date_label": future_date_label,
             "episode_summary": summary,
+            "sns_copy": sns_copy,
+            "visual_prompt": visual_prompt,
         }
 
     def _create_publication_schedule(self, order: dict) -> list[dict]:
@@ -193,14 +205,12 @@ JSON으로 반환:
 {{"approved": true/false, "score": 0.0-1.0, "feedback": "간단한 피드백"}}
 """
         try:
-            response = self.run_sync(prompt)
+            content_text = self.run_sync(prompt)
             import json
-            for block in response.content:
-                if hasattr(block, "text"):
-                    start = block.text.find("{")
-                    end = block.text.rfind("}") + 1
-                    if start != -1:
-                        return json.loads(block.text[start:end])
+            start = content_text.find("{")
+            end = content_text.rfind("}") + 1
+            if start != -1:
+                return json.loads(content_text[start:end])
         except Exception as e:
             logger.error("quality_review_failed", error=str(e))
 

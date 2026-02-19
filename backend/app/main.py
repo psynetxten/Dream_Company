@@ -10,24 +10,11 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """앱 시작/종료 이벤트"""
-    # 시작
+    """앱 시작/종료 이벤트 (Vercel Serverless 호환)"""
     logger.info("dream_newspaper_starting", environment=settings.ENVIRONMENT)
-
-    # ChromaDB 기업 데이터 로드 (최초 1회)
-    try:
-        from app.agents.sponsor_matcher.company_db_loader import load_companies_to_chromadb
-        load_companies_to_chromadb()
-    except Exception as e:
-        logger.warning("company_db_load_failed", error=str(e))
-
-    # 스케줄러 시작
-    try:
-        from app.tasks.daily_publish import setup_scheduler
-        setup_scheduler()
-        logger.info("scheduler_initialized")
-    except Exception as e:
-        logger.error("scheduler_init_failed", error=str(e))
+    
+    # Supabase pgvector 및 테이블 초기화는 이제 수동 또는 별도 마이그레이션 스크립트로 관리합니다.
+    # 서버리스 환경 특성상 매 시작 시 대규모 로딩은 피합니다.
 
     yield
 

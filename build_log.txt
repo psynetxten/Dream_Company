@@ -1,0 +1,181 @@
+--progress is a global compose flag, better use `docker compose --progress xx build ...
+time="2026-02-17T18:43:19+09:00" level=warning msg="C:\\Users\\default.DESKTOP-BKS2NBV\\OneDrive\\Desktop\\꿈신문사 CTO\\dream-newspaper\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image dream-newspaper-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 674B 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load build definition from backend.Dockerfile
+#2 transferring dockerfile: 537B 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.13-slim
+#3 ...
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [internal] load metadata for ghcr.io/astral-sh/uv:latest
+#5 DONE 1.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.13-slim
+#3 DONE 1.4s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 2.67kB 0.0s done
+#7 DONE 0.1s
+
+#8 FROM ghcr.io/astral-sh/uv:latest@sha256:7a88d4c4e6f44200575000638453a5a381db0ae31ad5c3a51b14f8687c9d93a3
+#8 resolve ghcr.io/astral-sh/uv:latest@sha256:7a88d4c4e6f44200575000638453a5a381db0ae31ad5c3a51b14f8687c9d93a3 0.1s done
+#8 DONE 0.1s
+
+#9 [stage-0 1/7] FROM docker.io/library/python:3.13-slim@sha256:3de9a8d7aedbb7984dc18f2dff178a7850f16c1ae7c34ba9d7ecc23d0755e35f
+#9 resolve docker.io/library/python:3.13-slim@sha256:3de9a8d7aedbb7984dc18f2dff178a7850f16c1ae7c34ba9d7ecc23d0755e35f
+#9 resolve docker.io/library/python:3.13-slim@sha256:3de9a8d7aedbb7984dc18f2dff178a7850f16c1ae7c34ba9d7ecc23d0755e35f 0.1s done
+#9 DONE 0.1s
+
+#10 [stage-0 2/7] WORKDIR /app
+#10 CACHED
+
+#11 [stage-0 3/7] RUN apt-get update && apt-get install -y     gcc     libpq-dev     && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [stage-0 4/7] COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+#12 CACHED
+
+#13 [stage-0 5/7] COPY pyproject.toml uv.lock* ./
+#13 CACHED
+
+#14 [stage-0 6/7] RUN uv sync --no-dev
+#14 0.732 Using CPython 3.13.12 interpreter at: /usr/local/bin/python3
+#14 0.732 Creating virtual environment at: .venv
+#14 0.754 Resolved 120 packages in 1ms
+#14 0.789    Building dream-newspaper-backend @ file:///app
+#14 1.042 Downloading chromadb (20.4MiB)
+#14 1.052 Downloading tokenizers (3.1MiB)
+#14 1.068 Downloading pygments (1.2MiB)
+#14 1.071 Downloading onnxruntime (16.3MiB)
+#14 1.072 Downloading sqlalchemy (3.1MiB)
+#14 1.075 Downloading sympy (6.0MiB)
+#14 1.080 Downloading hf-xet (3.2MiB)
+#14 1.083 Downloading cryptography (4.3MiB)
+#14 1.089 Downloading numpy (15.8MiB)
+#14 1.091 Downloading grpcio (6.4MiB)
+#14 1.093 Downloading asyncpg (3.4MiB)
+#14 1.094 Downloading kubernetes (1.9MiB)
+#14 1.097 Downloading uvloop (4.2MiB)
+#14 1.098 Downloading pydantic-core (2.0MiB)
+#14 6.064  Downloaded pygments
+#14 7.577  Downloaded kubernetes
+#14 7.656  Downloaded pydantic-core
+#14 8.445   × Failed to build `dream-newspaper-backend @ file:///app`
+#14 8.445   ├─▶ The build backend returned an error
+#14 8.445   ╰─▶ Call to `hatchling.build.build_editable` failed (exit status: 1)
+#14 8.445 
+#14 8.445       [stderr]
+#14 8.445       Traceback (most recent call last):
+#14 8.445         File "<string>", line 11, in <module>
+#14 8.445           wheel_filename =
+#14 8.445       backend.build_editable("/root/.cache/uv/builds-v0/.tmpUicgl4", {}, None)
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/build.py",
+#14 8.445       line 83, in build_editable
+#14 8.445           return os.path.basename(next(builder.build(directory=wheel_directory,
+#14 8.445       versions=["editable"])))
+#14 8.445       
+#14 8.445       ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/plugin/interface.py",
+#14 8.445       line 157, in build
+#14 8.445           artifact = version_api[version](directory, **build_data)
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/wheel.py",
+#14 8.445       line 522, in build_editable
+#14 8.445           return self.build_editable_detection(directory, **build_data)
+#14 8.445                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/wheel.py",
+#14 8.445       line 534, in build_editable_detection
+#14 8.445           for included_file in self.recurse_selected_project_files():
+#14 8.445                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/plugin/interface.py",
+#14 8.445       line 182, in recurse_selected_project_files
+#14 8.445           if self.config.only_include:
+#14 8.445              ^^^^^^^^^^^^^^^^^^^^^^^^
+#14 8.445         File "/usr/local/lib/python3.13/functools.py", line 1025, in __get__
+#14 8.445           val = self.func(instance)
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/config.py",
+#14 8.445       line 715, in only_include
+#14 8.445           only_include = only_include_config.get("only-include",
+#14 8.445       self.default_only_include()) or self.packages
+#14 8.445       
+#14 8.445       ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/wheel.py",
+#14 8.445       line 268, in default_only_include
+#14 8.445           return self.default_file_selection_options.only_include
+#14 8.445                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#14 8.445         File "/usr/local/lib/python3.13/functools.py", line 1025, in __get__
+#14 8.445           val = self.func(instance)
+#14 8.445         File
+#14 8.445       "/root/.cache/uv/builds-v0/.tmplmnA0a/lib/python3.13/site-packages/hatchling/builders/wheel.py",
+#14 8.445       line 256, in default_file_selection_options
+#14 8.445           raise ValueError(message)
+#14 8.445       ValueError: Unable to determine which files to ship
+#14 8.445       inside the wheel using the following heuristics:
+#14 8.445       https://hatch.pypa.io/latest/plugins/builder/wheel/#default-file-selection
+#14 8.445 
+#14 8.445       The most likely cause of this is that there is no directory that matches
+#14 8.445       the name of your project (dream_newspaper_backend).
+#14 8.445 
+#14 8.445       At least one file selection option must be defined
+#14 8.445       in the `tool.hatch.build.targets.wheel` table, see:
+#14 8.445       https://hatch.pypa.io/latest/config/build/
+#14 8.445 
+#14 8.445       As an example, if you intend to ship a directory named `foo` that
+#14 8.445       resides within a `src` directory located at the root of your project,
+#14 8.445       you can define the following:
+#14 8.445 
+#14 8.445       [tool.hatch.build.targets.wheel]
+#14 8.445       packages = ["src/foo"]
+#14 8.445 
+#14 8.445       hint: This usually indicates a problem with the package or the build
+#14 8.445       environment.
+#14 ERROR: process "/bin/sh -c uv sync --no-dev" did not complete successfully: exit code: 1
+------
+ > [stage-0 6/7] RUN uv sync --no-dev:
+8.445 
+8.445       As an example, if you intend to ship a directory named `foo` that
+8.445       resides within a `src` directory located at the root of your project,
+8.445       you can define the following:
+8.445 
+8.445       [tool.hatch.build.targets.wheel]
+8.445       packages = ["src/foo"]
+8.445 
+8.445       hint: This usually indicates a problem with the package or the build
+8.445       environment.
+------
+backend.Dockerfile:16
+
+--------------------
+
+  14 |     # 의존성 설치 (캐시 레이어)
+
+  15 |     COPY pyproject.toml uv.lock* ./
+
+  16 | >>> RUN uv sync --no-dev
+
+  17 |     
+
+  18 |     # 소스 복사
+
+--------------------
+
+failed to solve: process "/bin/sh -c uv sync --no-dev" did not complete successfully: exit code: 1
+

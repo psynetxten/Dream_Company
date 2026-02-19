@@ -1,14 +1,11 @@
-"""
-글로벌 기업 데이터를 ChromaDB에 로드하는 스크립트.
-스폰서 매칭 에이전트가 사용하는 벡터 DB 초기화.
-"""
-from app.vector_store import get_or_create_collection, COMPANIES_COLLECTION
+import asyncio
+from app.config import settings
+from supabase import create_client, Client
+import google.generativeai as genai
+import numpy as np
 
-# 초기 글로벌 기업 데이터 (한국 + 글로벌 주요 기업)
+# 초기 글로벌 기업 데이터
 INITIAL_COMPANIES = [
-    # ============================
-    # 한국 대기업
-    # ============================
     {
         "id": "samsung_electronics",
         "name": "삼성전자",
@@ -73,9 +70,6 @@ INITIAL_COMPANIES = [
         "keywords": ["게임", "PUBG", "메타버스", "인디게임", "게임 개발"],
         "careers": ["게임 개발자", "그래픽 아티스트", "게임 기획자", "QA 엔지니어"],
     },
-    # ============================
-    # 글로벌 빅테크
-    # ============================
     {
         "id": "google",
         "name": "Google",
@@ -132,9 +126,6 @@ INITIAL_COMPANIES = [
         "keywords": ["AI", "LLM", "ChatGPT", "딥러닝", "연구", "AGI"],
         "careers": ["AI/ML 연구원", "소프트웨어 엔지니어", "프로덕트 매니저", "AI 안전 연구원"],
     },
-    # ============================
-    # 금융/컨설팅
-    # ============================
     {
         "id": "mckinsey",
         "name": "McKinsey & Company",
@@ -151,9 +142,6 @@ INITIAL_COMPANIES = [
         "keywords": ["투자은행", "금융", "IB", "트레이딩", "자산관리", "핀테크"],
         "careers": ["투자 분석가", "퀀트 개발자", "트레이더", "리스크 매니저"],
     },
-    # ============================
-    # 스타트업/유니콘
-    # ============================
     {
         "id": "toss",
         "name": "토스(비바리퍼블리카)",
@@ -172,44 +160,52 @@ INITIAL_COMPANIES = [
     },
 ]
 
+# Gemini 설정 (임베딩용)
+if hasattr(settings, "GOOGLE_API_KEY") and settings.GOOGLE_API_KEY:
+    genai.configure(api_key=settings.GOOGLE_API_KEY)
 
-def load_companies_to_chromadb():
-    """기업 데이터를 ChromaDB에 로드"""
-    collection = get_or_create_collection(COMPANIES_COLLECTION)
+async def get_embedding(text: str):
+    """Gemini를 사용한 텍스트 임베딩 생성"""
+    result = genai.embed_content(
+        model="models/gemini-embedding-001",
+        content=text,
+        task_type="retrieval_document"
+    )
+    return result['embedding']
 
-    # 기존 데이터 확인
-    existing = collection.count()
-    if existing > 0:
-        print(f"이미 {existing}개 기업 데이터가 존재합니다. 업데이트를 건너뜁니다.")
-        return
-
-    ids = []
-    documents = []
-    metadatas = []
+async def load_companies_to_supabase():
+    """기업 데이터를 Supabase Python SDK를 통해 로드 (SQLAlchemy 연결 이슈 우회)"""
+    print("Supabase Python SDK migration started...")
+    
+    supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
     for company in INITIAL_COMPANIES:
-        ids.append(company["id"])
-
-        # 검색용 텍스트 (임베딩될 내용)
-        doc_text = f"""
-회사명: {company['name']}
-업종: {company['industry']}
-설명: {company['description']}
-키워드: {', '.join(company['keywords'])}
-채용 직군: {', '.join(company['careers'])}
-""".strip()
-
-        documents.append(doc_text)
-        metadatas.append({
-            "name": company["name"],
-            "industry": company["industry"],
-            "keywords": ",".join(company["keywords"]),
-            "careers": ",".join(company["careers"]),
-        })
-
-    collection.add(ids=ids, documents=documents, metadatas=metadatas)
-    print(f"✅ {len(ids)}개 기업 데이터를 ChromaDB에 로드했습니다.")
-
+        print(f"Processing ID: {company['id']}")
+        doc_text = f"Name: {company['name']}\nIndustry: {company['industry']}\nDescription: {company['description']}\nKeywords: {', '.join(company['keywords'])}\nCareers: {', '.join(company['careers'])}"
+        
+        embedding = await get_embedding(doc_text)
+        
+        # vector_items 테이블에 직접 삽입 (Supabase RPC 또는 Rest API)
+        # 참고: vector_items 테이블이 이미 생성되어 있어야 함 (CEO님이 SQL Editor에서 Extension을 켰다면)
+        # 하지만 SDK로 테이블 생성을 직접 하기는 어려우므로, 
+        # 만약 테이블이 없다면 CEO님께 테이블 생성 SQL을 부탁드릴 예정입니다.
+        
+        data = {
+            "collection_name": "companies",
+            "external_id": company["id"],
+            "document": doc_text,
+            "metadata_json": {
+                "name": company["name"],
+                "industry": company["industry"],
+            },
+            "embedding": embedding
+        }
+        
+        try:
+            res = supabase.table("vector_items").insert(data).execute()
+            print(f"Successfully loaded ID: {company['id']}")
+        except Exception as e:
+            print(f"Failed to load ID: {company['id']}: {e}")
 
 if __name__ == "__main__":
-    load_companies_to_chromadb()
+    asyncio.run(load_companies_to_supabase())

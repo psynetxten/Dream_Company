@@ -1,0 +1,16 @@
+fastapi
+pydantic
+pydantic-settings
+sqlalchemy[asyncio]
+asyncpg
+supabase
+google-generativeai
+pgvector
+structlog
+python-multipart
+pyjwt
+cryptography
+authlib
+httpx
+uvicorn
+anthropic

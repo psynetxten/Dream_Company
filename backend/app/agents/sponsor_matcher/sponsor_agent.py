@@ -89,12 +89,7 @@ class SponsorMatcherAgent(BaseAgent):
 ]
 """
         try:
-            response = self.run_sync(prompt)
-            result_text = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    result_text = block.text
-                    break
+            result_text = self.run_sync(prompt)
 
             # JSON 파싱
             start = result_text.find("[")

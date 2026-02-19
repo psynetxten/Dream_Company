@@ -58,6 +58,10 @@ class Newspaper(Base):
     generation_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # 신규 추가: 마케팅 및 콘텐츠 에셋
+    sns_copy: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False) # 마케팅 팀장 제작
+    visual_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)     # 콘텐츠 디렉터 제작
+
     # 사용자 반응
     view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_saved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

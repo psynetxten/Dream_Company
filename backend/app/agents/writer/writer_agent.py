@@ -47,12 +47,7 @@ class WriterAgent(BaseAgent):
         )
 
         # 1차 시도
-        response = self.run_sync(prompt)
-        content_text = ""
-        for block in response.content:
-            if hasattr(block, "text"):
-                content_text = block.text
-                break
+        content_text = self.run_sync(prompt)
 
         # JSON 파싱 시도
         parsed = self._parse_json_response(content_text)
@@ -63,18 +58,17 @@ class WriterAgent(BaseAgent):
             parsed = self._retry_with_explicit_json(order_context, episode)
 
         generation_ms = int((time.time() - start_time) * 1000)
-        token_count = response.usage.input_tokens + response.usage.output_tokens
+        token_count = 0  # Gemini SDK에서 간편하게 가져오는 기능 추가 전까지 0으로 유지
 
         logger.info(
             "writer_agent_done",
             episode=episode,
             generation_ms=generation_ms,
-            tokens=token_count,
         )
 
         return {
             **parsed,
-            "ai_model": self.model,
+            "ai_model": self.model_name,
             "generation_ms": generation_ms,
             "token_count": token_count,
             "raw_content": content_text,
@@ -129,12 +123,10 @@ class WriterAgent(BaseAgent):
   "sidebar": {{"quote": "주인공의 말", "stats": [{{"label": "지표명", "value": "수치"}}]}}
 }}
 """
-        response = self.run_sync(retry_prompt)
-        for block in response.content:
-            if hasattr(block, "text"):
-                parsed = self._parse_json_response(block.text)
-                if parsed:
-                    return parsed
+        content_text = self.run_sync(retry_prompt)
+        parsed = self._parse_json_response(content_text)
+        if parsed:
+            return parsed
 
         # 최후의 수단: 기본 구조 반환
         return {
@@ -155,8 +147,5 @@ class WriterAgent(BaseAgent):
 
 3문장 요약:
 """
-        response = self.run_sync(prompt)
-        for block in response.content:
-            if hasattr(block, "text"):
-                return block.text.strip()
-        return ""
+        summary = self.run_sync(prompt)
+        return summary.strip()

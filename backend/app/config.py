@@ -8,20 +8,22 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",
+        extra="allow", # Allow Supabase keys from env
     )
 
     # ============================
     # AI API
     # ============================
-    ANTHROPIC_API_KEY: str
+    ANTHROPIC_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
 
     # ============================
     # 보안
     # ============================
-    SECRET_KEY: str
+    SECRET_KEY: str = "migration_placeholder_key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ============================
     # 데이터베이스
@@ -40,6 +42,12 @@ class Settings(BaseSettings):
     # ============================
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    BACKEND_URL: str = "http://localhost:8000"
+    
+    # Supabase (Zero Cost Pivot)
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = "" # Backend only
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_CORS_ORIGINS: str = '["http://localhost:3000"]'
 
@@ -53,9 +61,9 @@ class Settings(BaseSettings):
     # ============================
     # AI 모델 설정
     # ============================
-    ORCHESTRATOR_MODEL: str = "claude-sonnet-4-5-20250929"
-    WRITER_MODEL: str = "claude-haiku-4-5-20251001"
-    SPONSOR_MODEL: str = "claude-haiku-4-5-20251001"
+    ORCHESTRATOR_MODEL: str = "gemini-pro-latest"
+    WRITER_MODEL: str = "gemini-flash-latest"
+    SPONSOR_MODEL: str = "gemini-flash-latest"
     MAX_CONCURRENT_GENERATIONS: int = 5
 
     # ============================
@@ -64,6 +72,14 @@ class Settings(BaseSettings):
     PUBLISH_HOUR: int = 8
     PUBLISH_MINUTE: int = 0
     PUBLISH_TIMEZONE: str = "Asia/Seoul"
+
+    # ============================
+    # 소셜 로그인 (OAuth)
+    # ============================
+    KAKAO_CLIENT_ID: str = ""
+    KAKAO_CLIENT_SECRET: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
 
 
 settings = Settings()

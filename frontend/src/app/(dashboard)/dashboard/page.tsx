@@ -42,6 +42,21 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen max-w-4xl mx-auto px-6 py-8">
+      {/* 상단 네비게이션 */}
+      <div className="flex justify-between items-center mb-8 border-b border-ink pb-4">
+        <Link href="/" className="font-headline text-2xl font-bold">꿈신문사</Link>
+        <button
+          onClick={async () => {
+            const { supabase } = await import("@/lib/supabase");
+            await supabase.auth.signOut();
+            window.location.href = "/";
+          }}
+          className="text-sm font-bold border border-ink px-4 py-2 hover:bg-newsprint-200"
+        >
+          로그아웃
+        </button>
+      </div>
+
       {/* 헤더 */}
       <div className="newspaper-masthead px-0 mb-8">
         <div className="newspaper-date-line mb-2">

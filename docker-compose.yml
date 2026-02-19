@@ -56,7 +56,9 @@ services:
       chromadb:
         condition: service_started
     volumes:
-      - ./backend:/app
+      - ./backend:/app          # 소스 핫리로드용 바인드 마운트
+      - /app/.venv              # Docker 빌드 시 생성된 Linux .venv 보호
+                                # (Windows .venv로 덮어쓰면 argon2-cffi 바이너리 누락)
     command: >
       sh -c "uv run alembic upgrade head &&
              uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
@@ -78,10 +80,8 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+    # volumes 제거: standalone 프로덕션 빌드는 이미지 내부에 server.js가 있음.
+    # ./frontend:/app 볼륨이 /app을 덮어쓰면 server.js 사라져 크래시 발생.
     restart: unless-stopped
 
 volumes:
