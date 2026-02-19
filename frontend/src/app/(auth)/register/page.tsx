@@ -37,8 +37,13 @@ export default function RegisterPage() {
       if (data.user) {
         // 만약 이메일 확인이 필요없다면 바로 로그인 처리
         // 보통 Supabase 설정에서 "Confirm email"이 켜져있으면 바로 로그인 안됨
-        alert("회원가입이 완료되었습니다. 이메일을 확인하거나 로그인해주세요.");
-        router.push("/login");
+        if (data.session) {
+          alert("회원가입이 완료되었습니다!");
+          router.push("/dashboard");
+        } else {
+          alert("계정 생성이 완료되었습니다. 가입하신 이메일의 편지함에서 인증 메일을 확인해주세요!");
+          router.push("/login");
+        }
       }
     } catch (err: any) {
       setError(err.message || "회원가입에 실패했습니다.");
