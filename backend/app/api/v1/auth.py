@@ -16,25 +16,8 @@ from app.core.supabase_client import supabase
 
 security = HTTPBearer()
 
-# OAuth 설정
-oauth = OAuth()
-oauth.register(
-    name="kakao",
-    client_id=settings.KAKAO_CLIENT_ID,
-    client_secret=settings.KAKAO_CLIENT_SECRET,
-    authorize_url="https://kauth.kakao.com/oauth/authorize",
-    access_token_url="https://kauth.kakao.com/oauth/token",
-    userinfo_endpoint="https://kapi.kakao.com/v2/user/me",
-    client_kwargs={"scope": "account_email profile_nickname"},
-)
-
-oauth.register(
-    name="google",
-    client_id=settings.GOOGLE_CLIENT_ID,
-    client_secret=settings.GOOGLE_CLIENT_SECRET,
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
+# Supabase Auth Integration
+# Legacy Authlib registrations removed. Using Supabase OAuth via Frontend.
 
 
 async def get_current_user(
@@ -46,10 +29,17 @@ async def get_current_user(
     
     # Supabase SDK를 사용하여 토큰 검증 및 유저 정보 획득
     try:
+        # JWT 토큰 직접 검증
         user_res = supabase.auth.get_user(token)
-        if not user_res:
-             raise_unauthorized("Invalid session")
+        if not user_res or not user_res.user:
+             import structlog
+             log = structlog.get_logger()
+             log.error("auth_failed", token_preview=token[:10] + "...")
+             raise_unauthorized("Invalid session or user not found")
     except Exception as e:
+        import structlog
+        log = structlog.get_logger()
+        log.error("auth_exception", error=str(e), token_preview=token[:10] + "...")
         raise_unauthorized(f"Auth error: {str(e)}")
 
     supabase_user = user_res.user

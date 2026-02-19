@@ -54,9 +54,14 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         try:
-            return json.loads(self.BACKEND_CORS_ORIGINS)
+            origins = json.loads(self.BACKEND_CORS_ORIGINS)
+            # Add dynamic Vercel origins
+            if self.ENVIRONMENT == "production":
+                origins.append("https://dream-newspaper-phi.vercel.app")
+                origins.append("https://dream-newspaper.vercel.app")
+            return origins
         except Exception:
-            return ["http://localhost:3000"]
+            return ["http://localhost:3000", "https://dream-newspaper-phi.vercel.app"]
 
     # ============================
     # AI 모델 설정

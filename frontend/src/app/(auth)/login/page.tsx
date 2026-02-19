@@ -95,10 +95,15 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-1 gap-4">
             <button
-              onClick={() => supabase.auth.signInWithOAuth({
-                provider: 'kakao',
-                options: { redirectTo: `${window.location.origin}/dashboard` }
-              })}
+              onClick={() => {
+                const redirectUrl = typeof window !== "undefined"
+                  ? `${window.location.origin}/dashboard`
+                  : "https://dream-newspaper-phi.vercel.app/dashboard";
+                supabase.auth.signInWithOAuth({
+                  provider: 'kakao',
+                  options: { redirectTo: redirectUrl }
+                });
+              }}
               className="flex items-center justify-center gap-3 w-full bg-[#FEE500] text-[#191919] py-3 font-bold hover:bg-[#FADA0A] transition-colors border-2 border-ink"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -108,10 +113,15 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: { redirectTo: `${window.location.origin}/dashboard` }
-              })}
+              onClick={() => {
+                const redirectUrl = typeof window !== "undefined"
+                  ? `${window.location.origin}/dashboard`
+                  : "https://dream-newspaper-phi.vercel.app/dashboard";
+                supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: { redirectTo: redirectUrl }
+                });
+              }}
               className="flex items-center justify-center gap-3 w-full bg-newsprint-50 text-ink py-3 font-bold hover:bg-newsprint-100 transition-colors border-2 border-ink"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
