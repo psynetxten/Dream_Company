@@ -44,19 +44,35 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     BACKEND_URL: str = "http://localhost:8000"
     
-    # Supabase (Zero Cost Pivot)
+    # Supabase (Zero Cost Pivot) - Allow prefixes for Vercel harmony
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
+    NEXT_PUBLIC_SUPABASE_URL: str = ""
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: str = ""
+
     SUPABASE_SERVICE_ROLE_KEY: str = "" # Backend only
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_CORS_ORIGINS: str = '["http://localhost:3000"]'
+
+    @property
+    def is_production(self) -> bool:
+        import os
+        return self.ENVIRONMENT == "production" or os.getenv("VERCEL_ENV") == "production"
+
+    @property
+    def supabase_url(self) -> str:
+        return self.SUPABASE_URL or self.NEXT_PUBLIC_SUPABASE_URL
+
+    @property
+    def supabase_anon_key(self) -> str:
+        return self.SUPABASE_ANON_KEY or self.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     @property
     def cors_origins(self) -> List[str]:
         try:
             origins = json.loads(self.BACKEND_CORS_ORIGINS)
             # Add dynamic Vercel origins
-            if self.ENVIRONMENT == "production":
+            if self.is_production:
                 origins.append("https://dream-newspaper-phi.vercel.app")
                 origins.append("https://dream-newspaper.vercel.app")
             return origins
