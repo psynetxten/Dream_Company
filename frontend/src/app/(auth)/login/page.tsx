@@ -17,12 +17,30 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
+      console.log("Attempting Proxy Login...", form.email);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
       });
 
-      if (error) throw error;
+      const result = await response.json();
+      console.log("Proxy Login Response:", result);
+
+      if (!response.ok) {
+        throw new Error(result.detail || "로그인에 실패했습니다.");
+      }
+
+      // Supabase 클라이언트에 세션 수동 설정 (이게 중요!)
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      });
+
+      if (sessionError) throw sessionError;
 
       router.push("/dashboard");
     } catch (err: any) {

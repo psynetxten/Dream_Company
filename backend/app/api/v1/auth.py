@@ -74,6 +74,76 @@ async def get_current_user(
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+@router.post("/register", response_model=UserResponse)
+async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
+    """Backend Proxy Register: Supabase Admin SDK를 사용하여 유저 생성"""
+    try:
+        # 1. Supabase Admin API로 유저 생성 (Confirm Email 우회)
+        # Note: email_confirm=True로 설정하여 즉시 활성화
+        res = supabase.auth.admin.create_user({
+            "email": str(user_data.email),
+            "password": user_data.password,
+            "email_confirm": True,
+            "user_metadata": {"full_name": user_data.full_name}
+        })
+        
+        if not res or not res.user:
+            raise HTTPException(status_code=400, detail="Supabase user creation failed")
+            
+        supabase_user = res.user
+        
+        # 2. 로컬 DB에 유저 정보 저장 (이미 존재하는지 체크)
+        result = await db.execute(select(User).where(User.email == str(user_data.email)))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            user = User(
+                id=uuid.UUID(supabase_user.id),
+                email=str(user_data.email),
+                full_name=user_data.full_name,
+                is_active=True,
+                is_verified=True
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            
+        return user
+    except Exception as e:
+        import structlog
+        log = structlog.get_logger()
+        log.error("register_proxy_failed", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/login", response_model=dict)
+async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
+    """Backend Proxy Login: Supabase Auth를 통해 세션 획득"""
+    try:
+        # Supabase API를 직접 호출하여 로그인
+        res = supabase.auth.sign_in_with_password({
+            "email": str(login_data.email),
+            "password": login_data.password
+        })
+        
+        if not res or not res.session:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+        # 세션 정보 반환 (프론트엔드에서 수동 저장용)
+        return {
+            "access_token": res.session.access_token,
+            "refresh_token": res.session.refresh_token,
+            "expires_in": res.session.expires_in,
+            "user": {
+                "id": res.user.id,
+                "email": res.user.email,
+                "full_name": res.user.user_metadata.get("full_name", "꿈 참여자")
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """내 정보 조회 (Supabase 토큰 필요)"""
