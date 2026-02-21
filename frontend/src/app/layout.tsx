@@ -19,7 +19,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-newsprint-50 text-ink min-h-screen">{children}</body>
+      <body className="bg-newsprint-50 text-ink min-h-screen">
+        {children}
+        <div style={{ display: 'none' }}>v0.1.1-force-redeploy</div>
+      </body>
     </html>
   );
 }
