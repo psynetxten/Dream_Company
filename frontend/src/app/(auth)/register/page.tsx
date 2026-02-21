@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,30 +21,22 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      // Backend Proxy 회원가입 요청
-      console.log("Attempting Proxy Registration...", form.email);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.email,
-          password: form.password,
-          full_name: form.full_name,
-        }),
+      console.log("Attempting Registration Proxy via authApi...", form);
+      const res = await authApi.register({
+        email: form.email,
+        password: form.password,
+        full_name: form.full_name,
       });
 
-      const result = await response.json();
-      console.log("Proxy Registration Response:", result);
-
-      if (!response.ok) {
-        throw new Error(result.detail || "회원가입에 실패했습니다.");
-      }
-
+      console.log("Registration Success Response:", res.data);
       alert("회원가입이 완료되었습니다! 로그인해 주세요.");
       router.push("/login");
     } catch (err: any) {
-      console.error("Registration Error:", err);
-      setError(err.message || "회원가입에 실패했습니다.");
+      console.error("Registration Error Caught:", err);
+      // Axios 에러 처리
+      const errorMsg = err.response?.data?.detail || err.message || "회원가입 중 오류가 발생했습니다.";
+      setError(errorMsg);
+      console.log("Setting UI error state:", errorMsg);
     } finally {
       setLoading(false);
     }
