@@ -62,10 +62,12 @@ app.include_router(router)
 # ============================
 @app.get("/health")
 async def health_check():
+    import datetime
     return {
         "status": "ok",
         "service": "dream-newspaper",
-        "version": "0.1.0",
+        "version": "0.1.1",
+        "deployed_at": "2026-02-21 09:30",
         "environment": settings.ENVIRONMENT,
     }
 

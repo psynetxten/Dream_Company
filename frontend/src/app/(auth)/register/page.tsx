@@ -49,7 +49,7 @@ export default function RegisterPage() {
           <Link href="/" className="font-headline text-3xl font-bold">
             꿈신문사
           </Link>
-          <p className="text-sm text-ink-muted mt-1">회원가입</p>
+          <p className="text-sm text-ink-muted mt-1">회원가입 (v0.1.1)</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
