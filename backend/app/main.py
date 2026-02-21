@@ -63,13 +63,27 @@ app.include_router(router)
 @app.get("/health")
 async def health_check():
     import datetime
-    return {
-        "status": "ok",
-        "service": "dream-newspaper",
-        "version": "0.1.1",
-        "deployed_at": "2026-02-21 09:30",
-        "environment": settings.ENVIRONMENT,
-    }
+    import traceback
+    try:
+        # Check database connection (common cause of 500)
+        from app.database import engine
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        
+        return {
+            "status": "ok",
+            "service": "dream-newspaper",
+            "version": "0.1.2-diag",
+            "deployed_at": str(datetime.datetime.now()),
+            "db_connection": "ok"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "detail": str(e),
+            "traceback": traceback.format_exc()
+        }
 
 
 @app.get("/")
