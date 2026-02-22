@@ -15,6 +15,7 @@ const API_URL = getBaseUrl();
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
   headers: { "Content-Type": "application/json" },
+  timeout: 10000, // 10초 타임아웃
 });
 
 // 요청 인터셉터: Supabase 세션 토큰 자동 삽입
@@ -26,10 +27,16 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// 응답 인터셉터: 401 처리
+// 응답 인터셉터: 401 및 타임아웃 처리
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return Promise.reject(new Error('서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'));
+    }
+    if (!error.response) {
+      return Promise.reject(new Error('서버에 연결할 수 없습니다. 네트워크를 확인해주세요.'));
+    }
     if (error.response?.status === 401) {
       await supabase.auth.signOut();
       window.location.href = "/login";

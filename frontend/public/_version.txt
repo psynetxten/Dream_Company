@@ -1,0 +1,3 @@
+v0.2.0
+deployed: 2026-02-22
+commit: deployment-sync-check

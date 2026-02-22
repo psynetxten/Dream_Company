@@ -58,6 +58,14 @@ app.include_router(router)
 
 
 # ============================
+# 간단 ping (DB 연결 불필요)
+# ============================
+@app.get("/api/ping")
+async def ping():
+    return {"status": "pong", "version": "0.2.0", "service": "dream-newspaper"}
+
+
+# ============================
 # 헬스체크
 # ============================
 @app.get("/health")
