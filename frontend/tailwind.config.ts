@@ -27,6 +27,16 @@ const config: Config = {
           light: "#2d2d44",
           muted: "#4a4a5a",
         },
+        // AI Pro 테마 컬러 (ComfyUI 인스파이어드)
+        pro: {
+          bg: "#0b0b0f",
+          surface: "#16161d",
+          accent: "#3a86ff",
+          border: "#2d2d3a",
+          text: "#e0e0e6",
+          "text-muted": "#8e8e9a",
+          "node-bg": "#1e1e26",
+        },
       },
       fontFamily: {
         serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
@@ -41,3 +51,4 @@ const config: Config = {
 };
 
 export default config;
+
