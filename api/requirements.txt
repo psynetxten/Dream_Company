@@ -1,0 +1,8 @@
+fastapi
+pydantic
+pydantic-settings
+supabase
+httpx
+structlog
+python-multipart
+pyjwt
