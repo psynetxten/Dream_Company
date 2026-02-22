@@ -76,6 +76,41 @@ class LoginRequest(BaseModel):
 
 
 # ──────────────────────────
+# 회원가입 디버그 (임시)
+# ──────────────────────────
+@app.post("/api/v1/auth/register-debug")
+async def register_debug(body: RegisterRequest):
+    """Supabase 응답을 raw로 반환 — 500 원인 파악용 임시 엔드포인트"""
+    supabase_url = get_supabase_url()
+    service_key = get_supabase_service_key()
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{supabase_url}/auth/v1/admin/users",
+                headers={
+                    "apikey": service_key,
+                    "Authorization": f"Bearer {service_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "email": body.email,
+                    "password": body.password,
+                    "email_confirm": True,
+                    "user_metadata": {"full_name": body.full_name},
+                },
+            )
+        return {
+            "supabase_status": resp.status_code,
+            "supabase_body": resp.json(),
+            "url_used": f"{supabase_url}/auth/v1/admin/users",
+            "service_key_set": bool(service_key),
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+
+# ──────────────────────────
 # 회원가입 — Supabase Admin API
 # ──────────────────────────
 @app.post("/api/v1/auth/register")
@@ -89,21 +124,26 @@ async def register(body: RegisterRequest):
             detail="서버 환경변수 미설정: SUPABASE_URL 또는 SUPABASE_SERVICE_ROLE_KEY"
         )
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            f"{supabase_url}/auth/v1/admin/users",
-            headers={
-                "apikey": service_key,
-                "Authorization": f"Bearer {service_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "email": body.email,
-                "password": body.password,
-                "email_confirm": True,
-                "user_metadata": {"full_name": body.full_name},
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{supabase_url}/auth/v1/admin/users",
+                headers={
+                    "apikey": service_key,
+                    "Authorization": f"Bearer {service_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "email": body.email,
+                    "password": body.password,
+                    "email_confirm": True,
+                    "user_metadata": {"full_name": body.full_name},
+                },
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Supabase 연결 시간 초과. 잠시 후 다시 시도해주세요.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"네트워크 오류: {str(e)}")
 
     if resp.status_code in (200, 201):
         data = resp.json()
@@ -112,14 +152,12 @@ async def register(body: RegisterRequest):
             "user_id": data.get("id"),
             "email": data.get("email"),
         }
-    elif resp.status_code == 422:
-        raise HTTPException(status_code=400, detail="이미 사용 중인 이메일입니다.")
     else:
+        # 실패 시 Supabase 응답을 그대로 전달 (디버깅 목적)
         error = resp.json()
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=error.get("msg") or error.get("message") or "회원가입 실패"
-        )
+        detail = error.get("msg") or error.get("message") or error.get("error_description") or str(error)
+        raise HTTPException(status_code=400, detail=detail)
+
 
 
 # ──────────────────────────
