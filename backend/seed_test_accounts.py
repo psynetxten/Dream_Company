@@ -159,6 +159,49 @@ async def main():
                     ai_model='gemini-2.0-flash',
                 ))
             print(f"  [생성] Order + 신문 3편")
+
+            # ── 5. 작가 배정 주문 (진행 중인 의뢰) ──────────────────────────
+            assigned_order_id = uuid.uuid4()
+            db.add(Order(
+                id=assigned_order_id,
+                user_id=USER_ID,
+                protagonist_name='이도전',
+                dream_description='세계적인 피아니스트가 되어 카네기홀 무대에 서는 꿈',
+                target_role='클래식 피아니스트',
+                target_company='카네기홀',
+                duration_days=14,
+                future_year=2031,
+                payment_type='premium',
+                payment_status='paid',
+                status='active',
+                writer_type='human',
+                assigned_writer_id=WRITER_ID,
+            ))
+            print("  [생성] 작가 배정 주문 (진행 중인 의뢰)")
+
+            # ── 6. 작가를 기다리는 대기 주문들 ───────────────────────────────
+            for name, role, company, desc in [
+                ('박열정', '축구선수', 'FC 바르셀로나', '세계 최고의 축구선수가 되어 월드컵 우승을 이끄는 꿈'),
+                ('최우주', '우주비행사', 'NASA', '화성에 첫 발을 내딛는 한국인 우주비행사가 되는 꿈'),
+                ('김작가', '소설가', '문학동네', '전 세계가 읽는 베스트셀러 작가가 되어 노벨문학상을 받는 꿈'),
+            ]:
+                db.add(Order(
+                    id=uuid.uuid4(),
+                    user_id=USER_ID,
+                    protagonist_name=name,
+                    dream_description=desc,
+                    target_role=role,
+                    target_company=company,
+                    duration_days=7,
+                    future_year=2030,
+                    payment_type='premium',
+                    payment_status='paid',
+                    status='pending',
+                    writer_type='human',
+                    assigned_writer_id=None,
+                ))
+            print("  [생성] 대기 중인 의뢰 3건 (작가를 기다리는 꿈)")
+
         else:
             print(f"  [스킵] 이미 주문이 있습니다 ({len(existing_orders)}건)")
 
@@ -169,13 +212,13 @@ async def main():
     print("테스트 계정 준비 완료!")
     print("=" * 50)
     print()
-    print("  [유저]    test_user@dream.com    / Dream1234!")
+    print("  [유저]    test_user@dream.com    / 012340")
     print("            → 신문 3편, AI CEO 꿈 시리즈")
     print()
-    print("  [작가]    test_writer@dream.com  / Dream1234!")
+    print("  [작가]    test_writer@dream.com  / 012340")
     print("            → 작가 프로필, 평점 4.8, 24건 완료")
     print()
-    print("  [스폰서]  test_sponsor@dream.com / Dream1234!")
+    print("  [스폰서]  test_sponsor@dream.com / 012340")
     print("            → 드림테크 등록, 슬롯 2개 활성화")
 
 asyncio.run(main())
