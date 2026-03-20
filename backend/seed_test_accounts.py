@@ -177,7 +177,23 @@ async def main():
                 writer_type='human',
                 assigned_writer_id=WRITER_ID,
             ))
-            print("  [생성] 작가 배정 주문 (진행 중인 의뢰)")
+            await db.flush()
+
+            # 이도전 주문 blank 신문 드래프트 14편 (작가 편집기용)
+            from datetime import timedelta
+            for ep in range(1, 15):
+                future_dt = date(2031, 3, 20) + timedelta(days=ep - 1)
+                db.add(Newspaper(
+                    order_id=assigned_order_id,
+                    episode_number=ep,
+                    future_date=future_dt,
+                    headline="",
+                    subhead="",
+                    lead_paragraph="",
+                    body_content="",
+                    status="draft",
+                ))
+            print("  [생성] 작가 배정 주문 + blank 드래프트 14편 (진행 중인 의뢰)")
 
             # ── 6. 작가를 기다리는 대기 주문들 ───────────────────────────────
             for name, role, company, desc in [

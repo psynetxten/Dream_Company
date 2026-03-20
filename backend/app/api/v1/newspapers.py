@@ -74,7 +74,10 @@ async def get_newspaper(
     )
     order = order_result.scalar_one_or_none()
 
-    if not order or (order.user_id != current_user.id and current_user.role != "admin"):
+    is_owner = order.user_id == current_user.id
+    is_assigned_writer = order.assigned_writer_id == current_user.id
+    is_admin = current_user.role == "admin"
+    if not order or not (is_owner or is_assigned_writer or is_admin):
         raise_forbidden()
 
     # 조회수 증가
@@ -96,7 +99,10 @@ async def list_order_newspapers(
 
     if not order:
         raise_not_found("의뢰")
-    if order.user_id != current_user.id and current_user.role != "admin":
+    is_owner = order.user_id == current_user.id
+    is_assigned_writer = order.assigned_writer_id == current_user.id
+    is_admin = current_user.role == "admin"
+    if not (is_owner or is_assigned_writer or is_admin):
         raise_forbidden()
 
     result = await db.execute(

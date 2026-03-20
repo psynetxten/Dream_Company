@@ -7,6 +7,7 @@ from app.models.schedule import PublicationSchedule
 from app.models.agent_log import AgentLog
 from app.models.notification import Notification
 from app.models.refresh_token import RefreshToken
+from app.models.template import TemplateSeries, TemplateSlot, TemplateEpisode, TemplatePurchase
 
 __all__ = [
     "User",
@@ -19,4 +20,8 @@ __all__ = [
     "AgentLog",
     "Notification",
     "RefreshToken",
+    "TemplateSeries",
+    "TemplateSlot",
+    "TemplateEpisode",
+    "TemplatePurchase",
 ]

@@ -184,7 +184,11 @@ async def get_order(
 
     if not order:
         raise_not_found("의뢰")
-    if order.user_id != current_user.id and current_user.role != "admin":
+    # 의뢰 소유자 or 배정된 작가 or 어드민만 접근 허용
+    is_owner = order.user_id == current_user.id
+    is_assigned_writer = order.assigned_writer_id == current_user.id
+    is_admin = current_user.role == "admin"
+    if not (is_owner or is_assigned_writer or is_admin):
         raise_forbidden()
 
     total_result = await db.execute(

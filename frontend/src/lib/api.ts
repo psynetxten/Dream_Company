@@ -83,6 +83,24 @@ export const writerApi = {
     api.put(`/writer/newspapers/${id}`, content),
 };
 
+// 템플릿 마켓플레이스
+export const templateApi = {
+  // 마켓 (독자)
+  listMarket: (genre?: string) =>
+    api.get("/templates/market", { params: genre ? { genre } : {} }),
+  getMarket: (id: string) => api.get(`/templates/market/${id}`),
+  purchase: (id: string, slotValues: Record<string, string>) =>
+    api.post(`/templates/market/${id}/purchase`, { slot_values: slotValues }),
+  myPurchases: () => api.get("/templates/my-purchases"),
+  // 작가
+  create: (data: any) => api.post("/templates", data),
+  myTemplates: () => api.get("/templates/my"),
+  getDetail: (id: string) => api.get(`/templates/${id}/detail`),
+  updateEpisode: (templateId: string, episodeId: string, data: any) =>
+    api.put(`/templates/${templateId}/episodes/${episodeId}`, data),
+  publish: (id: string) => api.put(`/templates/${id}/publish`),
+};
+
 // 신문
 export const newspapersApi = {
   list: () => api.get("/newspapers"),
