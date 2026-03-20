@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sponsorApi, SponsorAnalytics } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -78,6 +79,12 @@ export default function SponsorDashboard() {
                 className="text-xs bg-ink text-newsprint-50 px-2 py-1 font-bold hover:opacity-90">
                 + 슬롯 구매
               </Link>
+              <button
+                onClick={async () => { await supabase.auth.signOut(); router.replace("/login"); }}
+                className="text-xs border border-ink px-2 py-1 font-bold hover:bg-ink hover:text-newsprint-50 transition-colors"
+              >
+                로그아웃
+              </button>
             </div>
           </div>
         </div>

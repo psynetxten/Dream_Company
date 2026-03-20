@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { writerApi, Order } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
 export default function WriterDashboard() {
@@ -11,6 +12,11 @@ export default function WriterDashboard() {
     const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.replace("/login");
+    };
 
     const fetchData = async () => {
         try {
@@ -53,9 +59,17 @@ export default function WriterDashboard() {
 
     return (
         <div className="max-w-6xl mx-auto px-6 py-12">
-            <header className="border-b-4 border-ink pb-4 mb-12">
-                <h1 className="font-headline text-4xl font-bold uppercase tracking-widest">작가 집무실</h1>
-                <p className="text-sm text-ink-muted mt-2 italic">전문 작가 전용 대시보드</p>
+            <header className="border-b-4 border-ink pb-4 mb-12 flex justify-between items-end">
+                <div>
+                    <h1 className="font-headline text-4xl font-bold uppercase tracking-widest">작가 집무실</h1>
+                    <p className="text-sm text-ink-muted mt-2 italic">전문 작가 전용 대시보드</p>
+                </div>
+                <button
+                    onClick={handleLogout}
+                    className="text-sm border-2 border-ink px-4 py-2 font-bold uppercase tracking-widest hover:bg-ink hover:text-newsprint-50 transition-colors"
+                >
+                    로그아웃
+                </button>
             </header>
 
             {error && (

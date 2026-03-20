@@ -1,7 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
 import { Newspaper } from "@/lib/api";
-import WorkflowNodes from "./WorkflowNodes";
 
 interface NewspaperLayoutProps {
   newspaper: Newspaper;
@@ -92,7 +90,6 @@ export default function NewspaperLayout({
   newspaper,
   protagonistName,
 }: NewspaperLayoutProps) {
-  const [isProMode, setIsProMode] = useState(true);
   const stats = newspaper.sidebar_content?.stats || [];
   const quote = newspaper.sidebar_content?.quote;
   const sponsorName = newspaper.variables_used?.sponsor;
@@ -104,34 +101,10 @@ export default function NewspaperLayout({
     ? `https://image.pollinations.ai/prompt/${encodeURIComponent(newspaper.visual_prompt)}?width=800&height=450&nologo=true&seed=${newspaper.id.slice(0, 4)}`
     : null;
 
-  useEffect(() => {
-    if (isProMode) {
-      document.body.classList.add("pro-dark");
-    } else {
-      document.body.classList.remove("pro-dark");
-    }
-    return () => document.body.classList.remove("pro-dark");
-  }, [isProMode]);
-
   return (
-    <article className="newspaper-page min-h-screen p-0 pb-12">
-      {/* AI 워크플로우 시각화 */}
-      <div className="max-w-4xl mx-auto pt-8 px-4">
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-[10px] font-mono text-pro-accent tracking-widest uppercase">
-            // Generative Pipeline Active
-          </div>
-          <button
-            onClick={() => setIsProMode(!isProMode)}
-            className="text-[10px] font-mono border border-pro-border px-2 py-1 rounded hover:bg-pro-node-bg transition-colors"
-          >
-            {isProMode ? "Switch to Classic" : "Switch to AI-PRO"}
-          </button>
-        </div>
-        <WorkflowNodes />
-      </div>
+    <article className="newspaper-page min-h-screen p-0 pb-12 bg-newsprint-50">
 
-      <div className="ai-pro-card mx-8 mb-12">
+      <div className="border-2 border-ink mx-4 mb-12 bg-newsprint-50">
         {/* ============================
             마스트헤드 (신문 상단 헤더)
             ============================ */}

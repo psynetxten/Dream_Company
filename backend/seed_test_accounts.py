@@ -203,7 +203,56 @@ async def main():
             print("  [생성] 대기 중인 의뢰 3건 (작가를 기다리는 꿈)")
 
         else:
-            print(f"  [스킵] 이미 주문이 있습니다 ({len(existing_orders)}건)")
+            print(f"  [스킵] 유저 주문이 이미 있습니다 ({len(existing_orders)}건)")
+
+        # ── 5. 작가 대시보드용 주문 (독립 체크) ──────────────────────────────
+        existing_writer_orders = (await db.execute(
+            select(Order).where(Order.writer_type == "human")
+        )).scalars().all()
+
+        if not existing_writer_orders:
+            # 진행 중인 의뢰 (WRITER_ID 배정)
+            db.add(Order(
+                id=uuid.uuid4(),
+                user_id=USER_ID,
+                protagonist_name='이도전',
+                dream_description='세계적인 피아니스트가 되어 카네기홀 무대에 서는 꿈',
+                target_role='클래식 피아니스트',
+                target_company='카네기홀',
+                duration_days=14,
+                future_year=2031,
+                payment_type='premium',
+                payment_status='paid',
+                status='active',
+                writer_type='human',
+                assigned_writer_id=WRITER_ID,
+            ))
+            print("  [생성] 작가 배정 주문 (진행 중인 의뢰)")
+
+            # 대기 중인 의뢰 3건
+            for name, role, company, desc in [
+                ('박열정', '축구선수', 'FC 바르셀로나', '세계 최고의 축구선수가 되어 월드컵 우승을 이끄는 꿈'),
+                ('최우주', '우주비행사', 'NASA', '화성에 첫 발을 내딛는 한국인 우주비행사가 되는 꿈'),
+                ('김작가', '소설가', '문학동네', '전 세계가 읽는 베스트셀러 작가가 되어 노벨문학상을 받는 꿈'),
+            ]:
+                db.add(Order(
+                    id=uuid.uuid4(),
+                    user_id=USER_ID,
+                    protagonist_name=name,
+                    dream_description=desc,
+                    target_role=role,
+                    target_company=company,
+                    duration_days=7,
+                    future_year=2030,
+                    payment_type='premium',
+                    payment_status='paid',
+                    status='pending',
+                    writer_type='human',
+                    assigned_writer_id=None,
+                ))
+            print("  [생성] 대기 중인 의뢰 3건 (작가를 기다리는 꿈)")
+        else:
+            print(f"  [스킵] 작가용 주문이 이미 있습니다 ({len(existing_writer_orders)}건)")
 
         await db.commit()
 
