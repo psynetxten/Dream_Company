@@ -1,10 +1,10 @@
 import asyncio
-from app.agents.orchestrator.orchestrator_agent import OrchestratorAgent
+from app.agents.editor_in_chief.agent import EditorInChief
 from datetime import datetime
 
 async def test_agent_integration():
     print("Testing Agent Integration (마케팅 팀장 & 콘텐츠 디렉터)...")
-    orchestrator = OrchestratorAgent()
+    orchestrator = EditorInChief()
     
     mock_order = {
         "id": "test-order-id",

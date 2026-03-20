@@ -1,24 +1,22 @@
 import structlog
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.config import settings
 
 logger = structlog.get_logger()
 
-class MarketingExpert:
-    """
-    마케팅 팀장 (Marketing Expert) 에이전트
-    - 꿈 신문 내용을 바탕으로 SNS용 홍보 카피와 해시태그를 생성합니다.
-    """
+class MarketingDirector:
+    """Marketing Director (마케팅 팀장) — SNS 홍보 카피 생성"""
 
     def __init__(self):
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel(settings.WRITER_MODEL)
-        self.agent_name = "마케팅 팀장"
+        self._client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        self.model_name = settings.WRITER_MODEL
+        self.agent_name = "marketing-director"
 
     async def generate_sns_copy(self, newspaper_content: str) -> dict:
         """SNS용 홍보 문구 생성"""
         prompt = f"""
-당신은 '꿈신문사'의 베테랑 [마케팅 팀장]입니다. 
+당신은 '꿈신문사'의 베테랑 [마케팅 팀장]입니다.
 당신의 임무는 아래의 '미래 뉴스' 내용을 바탕으로 사람들이 클릭하고 싶어하는 SNS 홍보 카피를 작성하는 것입니다.
 
 [미래 뉴스 내용]
@@ -36,13 +34,14 @@ class MarketingExpert:
   "twitter": "본문 내용"
 }}
         """
-        
+
         try:
-            response = await self.model.generate_content_async(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = await self._client.aio.models.generate_content(
+                model=self.model_name,
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                )
+                ),
+                contents=prompt,
             )
             import json
             return json.loads(response.text)

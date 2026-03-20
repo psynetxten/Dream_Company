@@ -1,28 +1,18 @@
 from app.config import settings
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import numpy as np
 
-if hasattr(settings, "GOOGLE_API_KEY") and settings.GOOGLE_API_KEY:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
+client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
-try:
-    result = genai.embed_content(
-        model="models/gemini-embedding-001",
-        content="Hello world",
-        task_type="retrieval_document"
-    )
-    embedding = result['embedding']
-    print(f"Model: gemini-embedding-001, Dimension: {len(embedding)}")
-except Exception as e:
-    print(f"Error checking gemini-embedding-001: {e}")
-
-try:
-    result = genai.embed_content(
-        model="models/embedding-001",
-        content="Hello world",
-        task_type="retrieval_document"
-    )
-    embedding = result['embedding']
-    print(f"Model: embedding-001, Dimension: {len(embedding)}")
-except Exception as e:
-    print(f"Error checking embedding-001: {e}")
+for model_name in ["models/gemini-embedding-001", "models/embedding-001"]:
+    try:
+        result = client.models.embed_content(
+            model=model_name,
+            contents="Hello world",
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+        )
+        embedding = result.embeddings[0].values
+        print(f"Model: {model_name}, Dimension: {len(embedding)}")
+    except Exception as e:
+        print(f"Error checking {model_name}: {e}")

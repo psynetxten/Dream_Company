@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime, date
-from sqlalchemy import String, Integer, Boolean, DateTime, Date, Text, ForeignKey, func
+from sqlalchemy import String, Integer, Boolean, DateTime, Date, Text, ForeignKey, func, JSON, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
 
 
@@ -10,10 +9,10 @@ class Newspaper(Base):
     __tablename__ = "newspapers"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     order_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("orders.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -32,16 +31,16 @@ class Newspaper(Base):
     lead_paragraph: Mapped[str | None] = mapped_column(Text, nullable=True)
     body_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     # {"quote": "...", "stats": [{"label": "성장률", "value": "143%"}]}
-    sidebar_content: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    sidebar_content: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
     # 메타데이터
     raw_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     # {"protagonist": "김철수", "company": "카카오", "sponsor": "삼성SDS"}
-    variables_used: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    variables_used: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
     # 스폰서 연결
     sponsor_slot_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sponsor_slots.id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("sponsor_slots.id"), nullable=True
     )
 
     # 발행 상태
@@ -59,7 +58,7 @@ class Newspaper(Base):
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # 신규 추가: 마케팅 및 콘텐츠 에셋
-    sns_copy: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False) # 마케팅 팀장 제작
+    sns_copy: Mapped[dict | None] = mapped_column(JSON, default=dict, nullable=True) # 마케팅 팀장 제작
     visual_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)     # 콘텐츠 디렉터 제작
 
     # 사용자 반응

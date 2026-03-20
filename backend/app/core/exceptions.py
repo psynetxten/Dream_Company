@@ -32,10 +32,10 @@ def raise_not_found(resource: str = "리소스"):
     )
 
 
-def raise_unauthorized():
+def raise_unauthorized(detail: str = "인증이 필요합니다."):
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="인증이 필요합니다.",
+        detail=detail,
         headers={"WWW-Authenticate": "Bearer"},
     )
 

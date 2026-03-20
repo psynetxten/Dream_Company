@@ -2,22 +2,22 @@ import json
 import time
 import re
 from app.agents.base_agent import BaseAgent
-from app.agents.writer.prompts import WRITER_SYSTEM_PROMPT, build_writer_prompt
+from app.agents.reporter.prompts import WRITER_SYSTEM_PROMPT, build_writer_prompt
 from app.config import settings
 import structlog
 
 logger = structlog.get_logger()
 
 
-class WriterAgent(BaseAgent):
-    """신문 1편 생성 에이전트 - claude-haiku (저비용 대량 생성)"""
+class Reporter(BaseAgent):
+    """Reporter (기자) — 신문 1편 JSON 생성"""
 
     def __init__(self):
         super().__init__(
             model=settings.WRITER_MODEL,
             max_tokens=3000,
             system_prompt=WRITER_SYSTEM_PROMPT,
-            agent_name="writer",
+            agent_name="reporter",
         )
 
     def generate_newspaper(self, order_context: dict, episode: int) -> dict:
@@ -58,7 +58,7 @@ class WriterAgent(BaseAgent):
             parsed = self._retry_with_explicit_json(order_context, episode)
 
         generation_ms = int((time.time() - start_time) * 1000)
-        token_count = 0  # Gemini SDK에서 간편하게 가져오는 기능 추가 전까지 0으로 유지
+        token_count = 0  # TODO: response.usage.input_tokens + output_tokens로 집계
 
         logger.info(
             "writer_agent_done",

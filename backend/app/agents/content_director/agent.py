@@ -1,19 +1,16 @@
 import structlog
-import google.generativeai as genai
+from google import genai
 from app.config import settings
 
 logger = structlog.get_logger()
 
-class ContentProducer:
-    """
-    콘텐츠 디렉터 (Content Producer) 에이전트
-    - 꿈 신문의 하이라이트 장면을 이미지로 생성하기 위한 상세 프롬프트를 제작합니다.
-    """
+class ContentDirector:
+    """Content Director (콘텐츠 디렉터) — 이미지 생성 프롬프트 제작"""
 
     def __init__(self):
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel(settings.WRITER_MODEL)
-        self.agent_name = "콘텐츠 디렉터"
+        self._client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        self.model_name = settings.WRITER_MODEL
+        self.agent_name = "content-director"
 
     async def generate_visual_prompt(self, newspaper_content: str) -> str:
         """이미지 생성용 상세 프롬프트 생성"""
@@ -31,10 +28,13 @@ class ContentProducer:
 [미래 뉴스 내용]
 {newspaper_content}
         """
-        
+
         try:
-            response = await self.model.generate_content_async(prompt)
+            response = await self._client.aio.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+            )
             return response.text.strip()
         except Exception as e:
-            logger.error("content_producer_failed", error=str(e))
+            logger.error("content_director_failed", error=str(e))
             return "A cinematic, photorealistic scene of a successful future career in a modern office, golden hour lighting, 8k."

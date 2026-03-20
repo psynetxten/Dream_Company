@@ -1,3 +1,6 @@
-v0.2.0
-deployed: 2026-02-22
-commit: deployment-sync-check
+v1.0.0
+Status: Graduated from Local Stabilization
+Phases 1-5 Completed: 2026-02-27
+Backend: FastAPI (Stable)
+Frontend: Next.js (Stable)
+DB: Ready for Supabase Migration

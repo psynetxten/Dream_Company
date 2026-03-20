@@ -42,7 +42,10 @@ export default function LoginPage() {
 
       if (sessionError) throw sessionError;
 
-      router.push("/dashboard");
+      const port = typeof window !== "undefined" ? window.location.port : "";
+      if (port === "3001") router.push("/writer/dashboard");
+      else if (port === "3002") router.push("/sponsor/dashboard");
+      else router.push("/dashboard");
     } catch (err: any) {
       console.error("Login Error:", err);
       const message = err.error_description || err.message || "로그인에 실패했습니다.";

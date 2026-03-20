@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, func
+from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, func, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
 
@@ -10,15 +9,15 @@ class PublicationSchedule(Base):
     __tablename__ = "publication_schedules"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     order_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("orders.id", ondelete="CASCADE"),
         nullable=False,
     )
     newspaper_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("newspapers.id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("newspapers.id"), nullable=True
     )
 
     episode_number: Mapped[int] = mapped_column(Integer, nullable=False)

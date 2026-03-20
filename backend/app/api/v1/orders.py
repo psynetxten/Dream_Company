@@ -27,6 +27,11 @@ async def create_order(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="기간은 7일, 14일, 30일 중 선택해야 합니다.")
 
+    # 무료 플랜은 7일만 허용
+    if data.payment_type == "free" and data.duration_days != 7:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="무료 플랜은 7일 시리즈만 이용 가능합니다.")
+
     order = Order(
         user_id=current_user.id,
         dream_description=data.dream_description,
@@ -38,7 +43,7 @@ async def create_order(
         series_theme=data.series_theme,
         future_year=data.future_year,
         payment_type=data.payment_type,
-        payment_status="pending",
+        payment_status="free" if data.payment_type == "free" else "pending",
         writer_type="ai",
         status="draft",
     )
@@ -68,14 +73,18 @@ async def start_order(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=f"이미 {order.status} 상태인 의뢰입니다.")
 
-    # 오케스트레이터 실행 (백그라운드)
-    background_tasks.add_task(_process_order_background, order_id=str(order.id))
+    # 결제 상태 확인 (무료 주문은 바로 시작)
+    if order.payment_type != "free" and order.payment_status != "paid":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=402, detail="결제가 완료되지 않았습니다.")
 
     # 상태 업데이트
     order.status = "active"
-    order.payment_status = "paid"  # MVP: 결제 생략
     order.starts_at = datetime.now(timezone.utc)
     await db.flush()
+
+    # 백그라운드: 오케스트레이터 실행 + 발행 스케줄 DB 저장
+    background_tasks.add_task(_process_order_background, str(order.id))
 
     return OrderStartResponse(
         order_id=order.id,
@@ -89,7 +98,7 @@ async def start_order(
 async def _process_order_background(order_id: str):
     """백그라운드: 오케스트레이터 실행 + 스케줄 DB 저장"""
     from app.database import get_db_session
-    from app.agents.orchestrator.orchestrator_agent import OrchestratorAgent
+    from app.agents.editor_in_chief.agent import EditorInChief
 
     async with get_db_session() as db:
         result = await db.execute(select(Order).where(Order.id == order_id))
@@ -107,15 +116,13 @@ async def _process_order_background(order_id: str):
             "future_year": order.future_year,
             "timezone": order.timezone,
             "publish_time": str(order.publish_time),
+            "writer_type": order.writer_type,
+            "payment_type": order.payment_type,
         }
 
-        import asyncio
-        loop = asyncio.get_event_loop()
-        orchestrator = OrchestratorAgent()
+        orchestrator = EditorInChief()
 
-        result_data = await loop.run_in_executor(
-            None, lambda: orchestrator.process_new_order(order_dict)
-        )
+        result_data = await orchestrator.process_new_order(order_dict)
 
         # 스케줄 DB 저장
         for item in result_data["schedule"]:

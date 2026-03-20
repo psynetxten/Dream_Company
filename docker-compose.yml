@@ -3,7 +3,7 @@ services:
   # PostgreSQL 16
   # ============================
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: dream_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-dream}
@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "3005:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dream}"]
       interval: 10s
@@ -29,7 +29,7 @@ services:
     volumes:
       - chroma_data:/chroma/chroma
     ports:
-      - "8001:8000"
+      - "3004:8000"
     environment:
       ANONYMIZED_TELEMETRY: "false"
     restart: unless-stopped
@@ -49,7 +49,7 @@ services:
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
     ports:
-      - "8000:8000"
+      - "3003:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,23 +65,56 @@ services:
     restart: unless-stopped
 
   # ============================
-  # Next.js 프론트엔드
+  # Next.js 프론트엔드 - 유저 (3000)
   # ============================
-  frontend:
+  frontend-user:
     build:
       context: ./frontend
       dockerfile: ../docker/frontend.Dockerfile
-    container_name: dream_frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
+    image: dream-newspaper-frontend
+    container_name: dream_frontend_user
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
     ports:
       - "3000:3000"
     depends_on:
       - backend
-    # volumes 제거: standalone 프로덕션 빌드는 이미지 내부에 server.js가 있음.
-    # ./frontend:/app 볼륨이 /app을 덮어쓰면 server.js 사라져 크래시 발생.
+    restart: unless-stopped
+
+  # ============================
+  # Next.js 프론트엔드 - 작가 (3001)
+  # ============================
+  frontend-writer:
+    image: dream-newspaper-frontend
+    container_name: dream_frontend_writer
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
+    ports:
+      - "3001:3000"
+    depends_on:
+      - frontend-user
+    restart: unless-stopped
+
+  # ============================
+  # Next.js 프론트엔드 - 스폰서 (3002)
+  # ============================
+  frontend-sponsor:
+    image: dream-newspaper-frontend
+    container_name: dream_frontend_sponsor
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
+    ports:
+      - "3002:3000"
+    depends_on:
+      - frontend-user
     restart: unless-stopped
 
 volumes:

@@ -10,18 +10,24 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """앱 시작/종료 이벤트 (Vercel Serverless 호환)"""
+    """앱 시작/종료 이벤트"""
     logger.info("dream_newspaper_starting", environment=settings.ENVIRONMENT)
-    
-    # Supabase pgvector 및 테이블 초기화는 이제 수동 또는 별도 마이그레이션 스크립트로 관리합니다.
-    # 서버리스 환경 특성상 매 시작 시 대규모 로딩은 피합니다.
+
+    # 스케줄러 시작 (매일 08:00 KST 자동 발행)
+    try:
+        from app.agents.publisher.agent import Publisher
+        scheduler_agent = Publisher()
+        scheduler_agent.start()
+        app.state.scheduler = scheduler_agent
+    except Exception as e:
+        logger.error("scheduler_start_failed", error=str(e))
 
     yield
 
     # 종료
     try:
-        from app.tasks.daily_publish import shutdown_scheduler
-        shutdown_scheduler()
+        if hasattr(app.state, "scheduler"):
+            app.state.scheduler.stop()
     except Exception:
         pass
 
@@ -45,7 +51,7 @@ app = FastAPI(
 # ============================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

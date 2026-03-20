@@ -13,7 +13,7 @@ from app.database import get_db_session
 from app.models.schedule import PublicationSchedule
 from app.models.order import Order
 from app.models.newspaper import Newspaper
-from app.agents.orchestrator.orchestrator_agent import OrchestratorAgent
+from app.agents.editor_in_chief.agent import EditorInChief
 from app.config import settings
 import structlog
 
@@ -26,7 +26,7 @@ scheduler = AsyncIOScheduler(timezone=settings.PUBLISH_TIMEZONE)
 async def process_single_schedule(
     db: AsyncSession,
     schedule: PublicationSchedule,
-    orchestrator: OrchestratorAgent,
+    orchestrator: EditorInChief,
     semaphore: asyncio.Semaphore,
 ):
     """단일 스케줄 처리"""
@@ -61,8 +61,18 @@ async def process_single_schedule(
                 if prev_newspaper and prev_newspaper.sidebar_content:
                     previous_summary = prev_newspaper.sidebar_content.get("episode_summary", "")
 
-            # 스폰서 정보 (MVP: 없으면 AI가 자동 매칭한 회사 사용)
+            # 스폰서 매칭: AdSales 에이전트로 최적 스폰서 선택
             sponsor_company = order.target_company
+            sponsor_data = None
+            try:
+                matched = await orchestrator.ad_sales.find_sponsors(order_dict)
+                if matched:
+                    top = matched[0]
+                    sponsor_company = top.get("company_name", order.target_company)
+                    sponsor_data = top
+                    logger.info("sponsor_matched_for_publish", company=sponsor_company)
+            except Exception as e:
+                logger.warning("sponsor_match_skipped", error=str(e))
 
             # 의뢰를 dict로 변환
             order_dict = {
@@ -75,12 +85,13 @@ async def process_single_schedule(
                 "future_year": order.future_year,
                 "timezone": order.timezone,
                 "publish_time": str(order.publish_time),
+                "writer_type": order.writer_type,
             }
 
             # 신문 생성
             scheduled_date = schedule.scheduled_at.astimezone(ZoneInfo(order.timezone))
 
-            newspaper_content = await orchestrator.generate_single_newspaper(
+            newspaper_content = await orchestrator.generate_with_editorial_loop(
                 order=order_dict,
                 episode=schedule.episode_number,
                 scheduled_date=scheduled_date,
@@ -107,6 +118,9 @@ async def process_single_schedule(
                     "protagonist": order.protagonist_name,
                     "company": order.target_company,
                     "sponsor": sponsor_company,
+                    "sponsor_industry": sponsor_data.get("industry", "") if sponsor_data else "",
+                    "sponsor_reason": sponsor_data.get("reason", "") if sponsor_data else "",
+                    "sponsor_is_paid": sponsor_data.get("is_paid", False) if sponsor_data else False,
                 },
                 ai_model=newspaper_content.get("ai_model"),
                 generation_ms=newspaper_content.get("generation_ms"),
@@ -168,7 +182,7 @@ async def daily_publication_job():
 
         logger.info("daily_publication_processing", count=len(pending_schedules))
 
-        orchestrator = OrchestratorAgent()
+        orchestrator = EditorInChief()
         semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_GENERATIONS)
 
         tasks = [

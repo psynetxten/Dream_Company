@@ -1,10 +1,10 @@
 import asyncio
 import json
-from app.agents.orchestrator.orchestrator_agent import OrchestratorAgent
+from app.agents.editor_in_chief.agent import EditorInChief
 from datetime import datetime
 
 async def capture_output():
-    orchestrator = OrchestratorAgent()
+    orchestrator = EditorInChief()
     mock_order = {
         "id": "test-order-id",
         "protagonist_name": "홍길동",

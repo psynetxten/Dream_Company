@@ -1,14 +1,14 @@
 import json
 from app.agents.base_agent import BaseAgent
-from app.vector_store import get_or_create_collection, COMPANIES_COLLECTION
+from app.vector_store import COMPANIES_COLLECTION
 from app.config import settings
 import structlog
 
 logger = structlog.get_logger()
 
 
-class SponsorMatcherAgent(BaseAgent):
-    """스폰서 자동 매칭 에이전트 - ChromaDB 벡터 검색 + Claude 판단"""
+class AdSales(BaseAgent):
+    """Ad Sales (광고 영업팀) — pgvector 스폰서 자동 매칭"""
 
     def __init__(self):
         super().__init__(
@@ -19,77 +19,110 @@ class SponsorMatcherAgent(BaseAgent):
 사용자의 꿈과 가장 관련성 높은 기업을 3개 선택하고 이유를 설명합니다.
 반드시 JSON 배열 형식으로만 반환하세요.
 """,
-            agent_name="sponsor_matcher",
+            agent_name="ad-sales",
         )
 
-    def find_sponsors(self, order: dict) -> list[dict]:
+    async def find_sponsors(self, order: dict) -> list[dict]:
         """
-        ChromaDB에서 적합한 스폰서 검색 후 Claude가 최종 선택
-
-        Args:
-            order: {protagonist_name, dream_description, target_role, target_company}
-
-        Returns:
-            [{"company_name": "...", "slot_type": "company_name", "score": 0.95, "reason": "..."}]
+        1. Paid Sponsors (DB) + Vector Search (Potential) 후보 병합
+        2. Claude/Gemini가 최적 3개 선택 (Paid 우선 가이드)
         """
-        # 1. 벡터 검색으로 후보 추출
+        from app.vector_store import query_vector_store, COMPANIES_COLLECTION
+        from app.database import AsyncSessionLocal
+        from app.models.sponsor import Sponsor, SponsorSlot
+        from sqlalchemy import select
+        
+        candidates = []
+        
+        # 1. Paid Sponsor (유료 광고주) 조회
         try:
-            collection = get_or_create_collection(COMPANIES_COLLECTION)
+            async with AsyncSessionLocal() as session:
+                paid_query = select(Sponsor, SponsorSlot).join(
+                    SponsorSlot, Sponsor.id == SponsorSlot.sponsor_id
+                ).where(
+                    SponsorSlot.remaining_quantity > 0,
+                    SponsorSlot.payment_status == "paid",
+                    Sponsor.is_active == True
+                )
+                paid_results = await session.execute(paid_query)
+                
+                for sponsor, slot in paid_results:
+                    candidates.append({
+                        "company_name": sponsor.company_name,
+                        "industry": sponsor.industry,
+                        "description": sponsor.description[:200] if sponsor.description else "",
+                        "is_paid": True,
+                        "slot_type": slot.slot_type,
+                        "score": 1.0 # 유료는 기본 점수 높음
+                    })
+        except Exception as e:
+            logger.warning("paid_sponsor_fetch_failed", error=str(e))
 
+        # 2. 벡터 검색으로 연관 기업(잠재 광고주) 추가 추출
+        try:
             query_text = (
                 f"{order.get('target_role', '')} "
                 f"{order.get('target_company', '')} "
                 f"{order.get('dream_description', '')}"
             )
 
-            results = collection.query(
-                query_texts=[query_text],
-                n_results=min(10, collection.count() or 1),
-                include=["documents", "metadatas", "distances"],
+            results = await query_vector_store(
+                COMPANIES_COLLECTION,
+                query_text,
+                n_results=10
             )
 
-            candidates = []
             if results["ids"] and results["ids"][0]:
                 for meta, doc, dist in zip(
                     results["metadatas"][0],
                     results["documents"][0],
                     results["distances"][0],
                 ):
+                    # 이미 유료 기업군에 있으면 중복 추가 방지
+                    if any(c["company_name"] == meta.get("name") for c in candidates):
+                        continue
+                        
                     candidates.append({
                         "company_name": meta.get("name", ""),
                         "industry": meta.get("industry", ""),
                         "description": doc[:200],
+                        "is_paid": False,
                         "similarity": round(1 - dist, 3),
                     })
 
         except Exception as e:
-            logger.warning("chroma_search_failed", error=str(e))
-            candidates = self._get_fallback_candidates(order)
+            logger.warning("vector_search_failed", error=str(e))
+            if not candidates:
+                candidates = self._get_fallback_candidates(order)
 
         if not candidates:
             candidates = self._get_fallback_candidates(order)
 
-        # 2. Claude가 최적 3개 선택
+        # 3. LLM이 최종 선택
         prompt = f"""
+당신은 꿈신문사의 스폰서 매칭 전문가입니다.
+사용자의 꿈과 가장 관련성 높은 기업을 후보 목록에서 3개 선택하세요.
+
 사용자 정보:
 - 꿈/목표: {order.get('dream_description', '')}
 - 목표 직업: {order.get('target_role', '')}
 - 목표 회사: {order.get('target_company', '없음')}
 
-후보 기업 목록:
+후보 기업 목록 (is_paid=True는 실제 유료 광고주이므로 우선 고려하세요):
 {json.dumps(candidates, ensure_ascii=False, indent=2)}
 
-위 후보 중 이 사용자의 꿈신문에 스폰서로 가장 적합한 기업 3개를 선택하세요.
-선택 기준: 직업/꿈과의 연관성, 브랜드 인지도, 독자 공감도
+선택 기준: 
+1. `is_paid: true`인 기업을 우선적으로 고려하되, 꿈의 내용과 너무 동떨어지지 않아야 함.
+2. 직업/꿈과의 연관성, 브랜드 인지도, 독자 공감도.
 
-다음 JSON 배열만 반환하세요:
+반드시 다음 JSON 배열 형식으로만 반환하세요:
 [
-  {{"company_name": "회사명", "slot_type": "company_name", "score": 0.95, "reason": "선택 이유"}},
+  {{"company_name": "회사명", "slot_type": "company_name", "score": 0.95, "reason": "선택 이유", "is_paid": true/false}},
   ...
 ]
 """
         try:
-            result_text = self.run_sync(prompt)
+            result_text = await self.run_async(prompt)
 
             # JSON 파싱
             start = result_text.find("[")
@@ -102,16 +135,8 @@ class SponsorMatcherAgent(BaseAgent):
         except Exception as e:
             logger.error("sponsor_match_failed", error=str(e))
 
-        # 폴백: 상위 3개 후보 반환
-        return [
-            {
-                "company_name": c["company_name"],
-                "slot_type": "company_name",
-                "score": c["similarity"],
-                "reason": "자동 매칭",
-            }
-            for c in candidates[:3]
-        ]
+        # 폴백: 점수/유사도 순으로 반환
+        return sorted(candidates, key=lambda x: x.get("is_paid", False), reverse=True)[:3]
 
     def _get_fallback_candidates(self, order: dict) -> list[dict]:
         """ChromaDB 연결 실패 시 폴백 후보"""

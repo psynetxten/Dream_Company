@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime, time
-from sqlalchemy import String, Integer, Boolean, DateTime, Time, Text, ForeignKey, func
+from sqlalchemy import String, Integer, Boolean, DateTime, Time, Text, ForeignKey, func, JSON, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
 
 
@@ -10,10 +9,10 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # 꿈 내용 (핵심 변수들)
@@ -24,7 +23,7 @@ class Order(Base):
 
     # 주변인 변수 (확장용)
     # [{"name": "김민준", "relation": "멘토", "company": "삼성"}]
-    supporting_people: Mapped[dict] = mapped_column(JSONB, default=list, nullable=False)
+    supporting_people: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
 
     # 상품 설정
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False)  # 7 | 14 | 30
@@ -39,10 +38,15 @@ class Order(Base):
         String(20), nullable=False, default="pending"
     )  # pending | paid | refunded | failed
     amount_krw: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    
+    # Portone 결제 추적 정보
+    merchant_uid: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    imp_uid: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # 작가 배정
     assigned_writer_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
     writer_type: Mapped[str] = mapped_column(
         String(10), nullable=False, default="ai"
@@ -69,6 +73,9 @@ class Order(Base):
     # 관계
     user: Mapped["User"] = relationship(  # noqa: F821
         "User", back_populates="orders", foreign_keys=[user_id]
+    )
+    assigned_writer: Mapped["User | None"] = relationship(  # noqa: F821
+        "User", back_populates="assigned_orders", foreign_keys=[assigned_writer_id]
     )
     newspapers: Mapped[list["Newspaper"]] = relationship(  # noqa: F821
         "Newspaper", back_populates="order", cascade="all, delete-orphan"

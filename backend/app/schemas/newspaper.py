@@ -28,6 +28,8 @@ class NewspaperResponse(BaseModel):
     is_saved: bool
     ai_model: Optional[str]
     generation_ms: Optional[int]
+    visual_prompt: Optional[str] = None
+    sns_copy: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 

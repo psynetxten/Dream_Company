@@ -7,7 +7,7 @@ const getBaseUrl = () => {
       return `https://${window.location.hostname}`;
     }
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003";
 };
 
 const API_URL = getBaseUrl();
@@ -51,7 +51,7 @@ api.interceptors.response.use(
 
 // 인증
 export const authApi = {
-  register: (data: { email: string; password: string; full_name: string }) =>
+  register: (data: { email: string; password: string; full_name: string; role?: string }) =>
     api.post("/auth/register", data),
   login: (data: { email: string; password: string }) =>
     api.post("/auth/login", data),
@@ -67,11 +67,64 @@ export const ordersApi = {
   getNewspapers: (orderId: string) => api.get(`/newspapers/orders/${orderId}`),
 };
 
+// 결제
+export const paymentApi = {
+  verify: (imp_uid: string, merchant_uid: string) =>
+    api.post("/payment/verify", null, { params: { imp_uid, merchant_uid } }),
+};
+
+// 작가
+export const writerApi = {
+  getProfile: () => api.get("/writer/me"),
+  getAssignedOrders: () => api.get("/writer/orders"),
+  getAvailableOrders: () => api.get("/writer/available-orders"),
+  claimOrder: (orderId: string) => api.post(`/writer/orders/${orderId}/claim`),
+  updateNewspaperDraft: (id: string, content: any) =>
+    api.put(`/writer/newspapers/${id}`, content),
+};
+
 // 신문
 export const newspapersApi = {
   list: () => api.get("/newspapers"),
   get: (id: string) => api.get(`/newspapers/${id}`),
+  publicFeed: (limit = 12) => api.get(`/newspapers/public?limit=${limit}`),
 };
+
+// 스폰서
+export const sponsorApi = {
+  getProfile: () => api.get("/sponsor/me"),
+  getSlots: () => api.get("/sponsor/slots"),
+  getMatches: () => api.get("/sponsor/matches"),
+  getAnalytics: () => api.get("/sponsor/analytics"),
+  register: (data: SponsorCreate) => api.post("/sponsor/register", data),
+  purchaseSlot: (data: SlotCreate) => api.post("/sponsor/slots", data),
+};
+
+export interface SponsorCreate {
+  company_name: string;
+  industry?: string;
+  description?: string;
+  website_url?: string;
+  contact_email?: string;
+  target_roles: string[];
+  target_companies: string[];
+  target_keywords: string[];
+}
+
+export interface SlotCreate {
+  slot_type: "company_name" | "brand_name" | "banner" | "sidebar";
+  variable_value: string;
+  purchased_quantity: number;
+}
+
+export interface SponsorAnalytics {
+  company_name: string;
+  total_slots: number;
+  active_slots: number;
+  total_exposures: number;
+  newspapers_featured: number;
+  remaining_impressions: number;
+}
 
 // ============================
 // 타입
@@ -83,7 +136,7 @@ export interface OrderCreate {
   target_company?: string;
   duration_days: 7 | 14 | 30;
   future_year?: number;
-  payment_type: "subscription" | "one_time";
+  payment_type: "subscription" | "one_time" | "free";
 }
 
 export interface Order {
@@ -96,6 +149,8 @@ export interface Order {
   future_year: number;
   payment_type: string;
   payment_status: string;
+  merchant_uid?: string;
+  imp_uid?: string;
   status: string;
   created_at: string;
   starts_at?: string;

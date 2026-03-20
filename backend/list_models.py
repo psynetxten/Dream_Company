@@ -1,12 +1,9 @@
 from app.config import settings
-import google.generativeai as genai
-
-if hasattr(settings, "GOOGLE_API_KEY") and settings.GOOGLE_API_KEY:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
+from google import genai
 
 try:
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            print(f"{m.name} - {m.display_name}")
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+    for m in client.models.list():
+        print(f"{m.name} - {m.display_name}")
 except Exception as e:
     print(f"Error listing models: {e}")

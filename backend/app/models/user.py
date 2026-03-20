@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, func
+from sqlalchemy import String, Boolean, DateTime, func, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
 
@@ -10,7 +9,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     # 소셜 로그인 유저는 비밀번호가 없을 수 있음
@@ -26,7 +25,7 @@ class User(Base):
 
     # 멀티테넌시(Sponsor)를 위한 조직 ID
     organization_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True
+        Uuid(as_uuid=True), nullable=True, index=True
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -50,6 +49,9 @@ class User(Base):
     # 관계
     orders: Mapped[list["Order"]] = relationship(  # noqa: F821
         "Order", back_populates="user", foreign_keys="Order.user_id"
+    )
+    assigned_orders: Mapped[list["Order"]] = relationship(  # noqa: F821
+        "Order", back_populates="assigned_writer", foreign_keys="Order.assigned_writer_id"
     )
     writer_profile: Mapped["WriterProfile | None"] = relationship(  # noqa: F821
         "WriterProfile", back_populates="user", uselist=False

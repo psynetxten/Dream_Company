@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, Numeric, func
+from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, Numeric, func, JSON, Uuid, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from app.database import Base
 
 
@@ -10,10 +9,10 @@ class Sponsor(Base):
     __tablename__ = "sponsors"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
 
     company_name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -53,10 +52,10 @@ class SponsorSlot(Base):
     __tablename__ = "sponsor_slots"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     sponsor_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sponsors.id"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("sponsors.id"), nullable=False, index=True
     )
 
     # 슬롯 타입: company_name | brand_name | banner | sidebar

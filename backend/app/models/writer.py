@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, Numeric, func, BigInteger
+from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, Numeric, func, BigInteger, JSON, Uuid, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from app.database import Base
 
 
@@ -10,10 +9,10 @@ class WriterProfile(Base):
     __tablename__ = "writer_profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
     )
 
     pen_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

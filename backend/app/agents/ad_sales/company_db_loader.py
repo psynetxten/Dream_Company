@@ -1,7 +1,8 @@
 import asyncio
 from app.config import settings
 from supabase import create_client, Client
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import numpy as np
 
 # 초기 글로벌 기업 데이터
@@ -160,52 +161,43 @@ INITIAL_COMPANIES = [
     },
 ]
 
-# Gemini 설정 (임베딩용)
-if hasattr(settings, "GOOGLE_API_KEY") and settings.GOOGLE_API_KEY:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
-
 async def get_embedding(text: str):
     """Gemini를 사용한 텍스트 임베딩 생성"""
-    result = genai.embed_content(
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+    result = client.models.embed_content(
         model="models/gemini-embedding-001",
-        content=text,
-        task_type="retrieval_document"
+        contents=text,
+        config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
     )
-    return result['embedding']
+    return result.embeddings[0].values
 
-async def load_companies_to_supabase():
-    """기업 데이터를 Supabase Python SDK를 통해 로드 (SQLAlchemy 연결 이슈 우회)"""
-    print("Supabase Python SDK migration started...")
+async def load_companies():
+    """기업 데이터를 vector_store를 통해 로드 (DB 독립적)"""
+    print("Starting data ingestion to vector store...")
     
-    supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-
+    from app.vector_store import add_to_vector_store, COMPANIES_COLLECTION
+    from app.database import init_db
+    
+    # 1. DB 초기화 (테이블 생성 확인)
+    await init_db()
+    
+    ids = [c["id"] for c in INITIAL_COMPANIES]
+    documents = []
+    metadatas = []
+    
     for company in INITIAL_COMPANIES:
-        print(f"Processing ID: {company['id']}")
         doc_text = f"Name: {company['name']}\nIndustry: {company['industry']}\nDescription: {company['description']}\nKeywords: {', '.join(company['keywords'])}\nCareers: {', '.join(company['careers'])}"
-        
-        embedding = await get_embedding(doc_text)
-        
-        # vector_items 테이블에 직접 삽입 (Supabase RPC 또는 Rest API)
-        # 참고: vector_items 테이블이 이미 생성되어 있어야 함 (CEO님이 SQL Editor에서 Extension을 켰다면)
-        # 하지만 SDK로 테이블 생성을 직접 하기는 어려우므로, 
-        # 만약 테이블이 없다면 CEO님께 테이블 생성 SQL을 부탁드릴 예정입니다.
-        
-        data = {
-            "collection_name": "companies",
-            "external_id": company["id"],
-            "document": doc_text,
-            "metadata_json": {
-                "name": company["name"],
-                "industry": company["industry"],
-            },
-            "embedding": embedding
-        }
-        
-        try:
-            res = supabase.table("vector_items").insert(data).execute()
-            print(f"Successfully loaded ID: {company['id']}")
-        except Exception as e:
-            print(f"Failed to load ID: {company['id']}: {e}")
+        documents.append(doc_text)
+        metadatas.append({
+            "name": company["name"],
+            "industry": company["industry"],
+        })
+    
+    try:
+        await add_to_vector_store(COMPANIES_COLLECTION, ids, documents, metadatas)
+        print(f"Successfully loaded {len(ids)} companies to vector store.")
+    except Exception as e:
+        print(f"Data ingestion failed: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(load_companies_to_supabase())
+    asyncio.run(load_companies())

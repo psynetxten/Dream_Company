@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "매일 아침, 당신의 꿈이 이루어진 미래를 신문으로 받아보세요.",
 };
 
+import { PortalProvider } from "@/components/PortalProvider";
+
 export default function RootLayout({
   children,
 }: {
@@ -18,10 +20,13 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <script src="https://cdn.iamport.kr/v1/iamport.js" async></script>
       </head>
       <body className="bg-newsprint-50 text-ink min-h-screen">
-        {children}
-        <div style={{ display: 'none' }}>v0.1.1-force-redeploy</div>
+        <PortalProvider>
+          {children}
+        </PortalProvider>
+        <div style={{ display: 'none' }}>v0.1.2-multi-portal</div>
       </body>
     </html>
   );

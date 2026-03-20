@@ -21,11 +21,15 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      console.log("Attempting Registration Proxy via authApi...", form);
+      const port = typeof window !== "undefined" ? window.location.port : "";
+      const role = port === "3001" ? "writer" : port === "3002" ? "sponsor" : "user";
+
+      console.log("Attempting Registration Proxy via authApi...", form, "role:", role);
       const res = await authApi.register({
         email: form.email,
         password: form.password,
         full_name: form.full_name,
+        role,
       });
 
       console.log("Registration Success Response:", res.data);

@@ -11,8 +11,10 @@ from app.core.security import get_password_hash, verify_password, create_access_
 from app.core.exceptions import raise_conflict, raise_unauthorized
 from app.config import settings
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from authlib.integrations.fastapi_client import OAuth
-from app.core.supabase_client import supabase
+from app.core.supabase_client import supabase, get_supabase_admin
+import structlog
+
+log = structlog.get_logger()
 
 security = HTTPBearer()
 
@@ -24,41 +26,37 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Supabase JWT 토큰을 검증하여 현재 사용자 추출"""
+    """Supabase JWT 토큰을 검증하여 현재 사용자 추출 및 로컬 Role 확인"""
     token = credentials.credentials
     
-    # Supabase SDK를 사용하여 토큰 검증 및 유저 정보 획득
     try:
         # JWT 토큰 직접 검증
         user_res = supabase.auth.get_user(token)
         if not user_res or not user_res.user:
-             import structlog
-             log = structlog.get_logger()
              log.error("auth_failed", token_preview=token[:10] + "...")
              raise_unauthorized("Invalid session or user not found")
     except Exception as e:
-        import structlog
-        log = structlog.get_logger()
         log.error("auth_exception", error=str(e), token_preview=token[:10] + "...")
         raise_unauthorized(f"Auth error: {str(e)}")
 
     supabase_user = user_res.user
     email = supabase_user.email
     
-    # DB에 해당 유저가 있는지 확인 (Local DB와 Supabase Auth 연동)
+    # DB에 해당 유저가 있는지 확인
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
     if not user:
-        # 이름 추출 (여러 메타데이터 필드 시도)
+        # 이름 추출
         metadata = supabase_user.user_metadata or {}
         full_name = metadata.get("full_name") or metadata.get("name") or metadata.get("nickname") or "꿈 참여자"
 
-        # 신규 유저라면 로컬 DB에 생성 (Lazy registration)
+        # 신규 유저라면 로컬 DB에 생성
         user = User(
             id=uuid.UUID(supabase_user.id),
             email=email,
             full_name=full_name,
+            role="user", # 기본값 명시
             is_active=True,
             is_verified=True
         )
@@ -71,6 +69,19 @@ async def get_current_user(
 
     return user
 
+
+def require_role(*allowed_roles: str):
+    """특정 role만 접근 허용하는 FastAPI Depends"""
+    async def role_checker(current_user: User = Depends(get_current_user)):
+        if current_user.role not in allowed_roles:
+            log.warning("role_access_denied", user_id=str(current_user.id), role=current_user.role, allowed=allowed_roles)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operation not permitted for this role"
+            )
+        return current_user
+    return role_checker
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -80,7 +91,8 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     try:
         # 1. Supabase Admin API로 유저 생성 (Confirm Email 우회)
         # Note: email_confirm=True로 설정하여 즉시 활성화
-        res = supabase.auth.admin.create_user({
+        admin_client = get_supabase_admin()
+        res = admin_client.auth.admin.create_user({
             "email": str(user_data.email),
             "password": user_data.password,
             "email_confirm": True,
@@ -97,10 +109,13 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
         user = result.scalar_one_or_none()
         
         if not user:
+            allowed_roles = {"user", "writer", "sponsor"}
+            role = user_data.role if user_data.role in allowed_roles else "user"
             user = User(
                 id=uuid.UUID(supabase_user.id),
                 email=str(user_data.email),
                 full_name=user_data.full_name,
+                role=role,
                 is_active=True,
                 is_verified=True
             )

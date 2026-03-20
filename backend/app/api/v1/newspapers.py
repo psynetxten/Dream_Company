@@ -13,6 +13,25 @@ import uuid
 router = APIRouter(prefix="/newspapers", tags=["newspapers"])
 
 
+@router.get("/public", response_model=list[NewspaperResponse])
+async def list_public_newspapers(
+    limit: int = 12,
+    db: AsyncSession = Depends(get_db),
+):
+    """공개 피드 - 인증 없이 최근 발행된 신문 열람 (홈페이지용)"""
+    result = await db.execute(
+        select(Newspaper)
+        .where(Newspaper.status == "published")
+        .order_by(Newspaper.published_at.desc())
+        .limit(limit)
+    )
+    newspapers = result.scalars().all()
+    for n in newspapers:
+        n.view_count += 1
+    await db.flush()
+    return newspapers
+
+
 @router.get("", response_model=list[NewspaperListItem])
 async def list_my_newspapers(
     db: AsyncSession = Depends(get_db),
