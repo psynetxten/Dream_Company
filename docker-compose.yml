@@ -65,16 +65,17 @@ services:
     restart: unless-stopped
 
   # ============================
-  # Next.js 프론트엔드 - 유저 (3000)
+  # Next.js 프론트엔드 (통합 단일 포털)
+  # 유저 / 작가 / 스폰서 — 로그인 후 role에 따라 자동 분기
   # ============================
-  frontend-user:
+  frontend:
     build:
       context: ./frontend
       dockerfile: ../docker/frontend.Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
     image: dream-newspaper-frontend
-    container_name: dream_frontend_user
+    container_name: dream_frontend
     env_file:
       - .env
     environment:
@@ -83,38 +84,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    restart: unless-stopped
-
-  # ============================
-  # Next.js 프론트엔드 - 작가 (3001)
-  # ============================
-  frontend-writer:
-    image: dream-newspaper-frontend
-    container_name: dream_frontend_writer
-    env_file:
-      - .env
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
-    ports:
-      - "3001:3000"
-    depends_on:
-      - frontend-user
-    restart: unless-stopped
-
-  # ============================
-  # Next.js 프론트엔드 - 스폰서 (3002)
-  # ============================
-  frontend-sponsor:
-    image: dream-newspaper-frontend
-    container_name: dream_frontend_sponsor
-    env_file:
-      - .env
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
-    ports:
-      - "3002:3000"
-    depends_on:
-      - frontend-user
     restart: unless-stopped
 
 volumes:

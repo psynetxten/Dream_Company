@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { writerApi, Order } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
+import { signOut } from "@/lib/auth";
 import Link from "next/link";
 
 export default function WriterDashboard() {
@@ -13,10 +13,7 @@ export default function WriterDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-        router.replace("/login");
-    };
+    const handleLogout = () => signOut();
 
     const fetchData = async () => {
         try {

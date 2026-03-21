@@ -26,7 +26,7 @@ export default function RootLayout({
         <PortalProvider>
           {children}
         </PortalProvider>
-        <div style={{ display: 'none' }}>v0.1.2-multi-portal</div>
+        <div style={{ display: 'none' }}>v0.2.0-unified-portal</div>
       </body>
     </html>
   );
