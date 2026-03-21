@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePortal } from "@/components/PortalProvider";
-import { newspapersApi, writerApi, sponsorApi, Newspaper, Order } from "@/lib/api";
+import { newspapersApi, writerApi, sponsorApi, templateApi, Newspaper, Order } from "@/lib/api";
 
 /* ─────────────────────────────────────────
    공용 유틸
@@ -294,16 +294,31 @@ function SponsorHome() {
 /* ═══════════════════════════════════════════
    유저 랜딩 (메인)
 ═══════════════════════════════════════════ */
+interface TopTemplate {
+  id: string;
+  title: string;
+  genre: string;
+  duration_days: number;
+  price_krw: number;
+  preview_headline: string;
+  slot_count: number;
+  purchase_count: number;
+}
+
 export default function LandingPage() {
   const { portalType } = usePortal();
   const [papers, setPapers] = useState<Newspaper[]>([]);
   const [loading, setLoading] = useState(true);
+  const [topTemplates, setTopTemplates] = useState<TopTemplate[]>([]);
 
   useEffect(() => {
     newspapersApi.publicFeed(6)
       .then((res) => setPapers(res.data?.length ? res.data : SAMPLE_PAPERS))
       .catch(() => setPapers(SAMPLE_PAPERS))
       .finally(() => setLoading(false));
+    templateApi.listMarket()
+      .then((res) => setTopTemplates((res.data || []).slice(0, 3)))
+      .catch(() => {});
   }, []);
 
   if (portalType === "writer")  return <WriterHome />;
@@ -380,6 +395,67 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        <Divider />
+
+        {/* ── 마켓 TOP 3 ── */}
+        {topTemplates.length > 0 && (
+          <section className="py-12">
+            <div className="flex items-baseline justify-between border-b-2 border-ink pb-2 mb-6">
+              <div>
+                <h2 className="font-headline text-xl font-bold uppercase tracking-wide">THE DREAM MARKET</h2>
+                <p className="text-xs text-ink-muted italic mt-1">작가가 써둔 시리즈 — 내 이름을 넣으면 나만의 신문이 됩니다</p>
+              </div>
+              <Link href="/market" className="text-[11px] font-bold hover:underline tracking-widest uppercase">
+                전체 보기 →
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {topTemplates.map((t) => (
+                <article key={t.id} className="border-2 border-ink bg-newsprint-50 hover:shadow-lg transition-shadow flex flex-col">
+                  <div className="bg-ink text-newsprint-50 px-4 py-1 flex justify-between items-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{t.genre}</span>
+                    <span className="text-[10px] font-bold">{t.duration_days}일 시리즈</span>
+                  </div>
+                  <div className="p-5 flex-1 flex flex-col">
+                    <h3 className="font-headline text-lg font-bold mb-2 leading-tight">{t.title}</h3>
+                    {t.preview_headline && (
+                      <div className="border-l-4 border-ink pl-3 mb-4 flex-1">
+                        <p className="font-serif italic text-xs leading-relaxed text-ink-muted line-clamp-3">
+                          &ldquo;{t.preview_headline}&rdquo;
+                        </p>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-ink-muted mb-4">
+                      ✦ 슬롯 {t.slot_count}개 개인화 &nbsp;·&nbsp; {t.purchase_count}명 구매
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-ink/20">
+                      <span className="font-headline text-xl font-black">
+                        {t.price_krw === 0 ? "무료" : `₩${t.price_krw.toLocaleString()}`}
+                      </span>
+                      <Link
+                        href={`/market/${t.id}`}
+                        className="bg-ink text-newsprint-50 px-4 py-1.5 font-bold text-xs uppercase tracking-widest hover:bg-ink/80 transition-colors"
+                      >
+                        내 이름으로 →
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="text-center mt-8">
+              <Link
+                href="/market"
+                className="inline-block border-2 border-ink px-10 py-3 font-bold text-sm uppercase tracking-widest hover:bg-newsprint-200 transition-colors"
+              >
+                마켓 전체 둘러보기 →
+              </Link>
+            </div>
+          </section>
+        )}
 
         <Divider />
 
