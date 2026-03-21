@@ -7,7 +7,7 @@ from app.agents.base_agent import BaseAgent
 from app.agents.reporter.agent import Reporter
 from app.agents.ad_sales.agent import AdSales
 from app.agents.marketing_director.agent import MarketingDirector
-from app.agents.content_director.agent import ContentDirector
+# from app.agents.content_director.agent import ContentDirector  # Phase 2: 이미지 생성 (보류)
 from app.agents.hr_manager.agent import HRManager
 from app.agents.editor_in_chief.prompts import ORCHESTRATOR_SYSTEM_PROMPT
 from app.config import settings
@@ -37,7 +37,7 @@ class EditorInChief(BaseAgent):
         self.reporter = Reporter()
         self.ad_sales = AdSales()
         self.marketing_director = MarketingDirector()
-        self.content_director = ContentDirector()
+        # self.content_director = ContentDirector()  # Phase 2: 이미지 생성 (보류)
         self.hr_manager = HRManager()
 
     async def process_new_order(self, order: dict) -> dict:
@@ -147,7 +147,9 @@ class EditorInChief(BaseAgent):
         full_text = f"{newspaper_content.get('headline')}\n{newspaper_content.get('body_content')}"
 
         sns_copy = await self.marketing_director.generate_sns_copy(full_text)
-        visual_prompt = await self.content_director.generate_visual_prompt(full_text)
+        # Phase 2: 이미지 생성 보류 — 토큰 절약 + Pollinations.ai 연동 추후 개발
+        # visual_prompt = await self.content_director.generate_visual_prompt(full_text)
+        visual_prompt = None
 
         return {
             **newspaper_content,

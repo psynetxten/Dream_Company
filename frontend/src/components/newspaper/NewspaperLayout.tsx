@@ -96,10 +96,10 @@ export default function NewspaperLayout({
   const sponsorIndustry = newspaper.variables_used?.sponsor_industry;
   const sponsorReason = newspaper.variables_used?.sponsor_reason;
 
-  // AI 프롬프트 기반 이미지 URL 생성 (Pollinations.ai)
-  const imageUrl = newspaper.visual_prompt
-    ? `https://image.pollinations.ai/prompt/${encodeURIComponent(newspaper.visual_prompt)}?width=800&height=450&nologo=true&seed=${newspaper.id.slice(0, 4)}`
-    : null;
+  // Phase 2: AI 이미지 생성 (Pollinations.ai) — 보류
+  // const imageUrl = newspaper.visual_prompt
+  //   ? `https://image.pollinations.ai/prompt/${encodeURIComponent(newspaper.visual_prompt)}?width=800&height=450&nologo=true&seed=${newspaper.id.slice(0, 4)}`
+  //   : null;
 
   return (
     <article className="newspaper-page min-h-screen p-0 pb-12 bg-newsprint-50">
@@ -139,20 +139,7 @@ export default function NewspaperLayout({
             )}
           </div>
 
-          {/* 메인 이미지 (AI 생성) */}
-          {imageUrl && (
-            <div className="mb-8 border-4 border-ink shadow-xl overflow-hidden group">
-              <img
-                src={imageUrl}
-                alt="Generated Dream Scene"
-                className="w-full h-auto object-cover transform transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="bg-ink text-newsprint-50 text-[10px] p-2 font-mono flex justify-between">
-                <span>Latent Space Visualization: {newspaper.visual_prompt?.slice(0, 60)}...</span>
-                <span className="text-pro-accent">DREAM SCENE</span>
-              </div>
-            </div>
-          )}
+          {/* Phase 2: AI 이미지 생성 — 보류 (Pollinations.ai 연동 예정) */}
 
           {/* 2컬럼 레이아웃 */}
           <div className="grid grid-cols-3 gap-6">
