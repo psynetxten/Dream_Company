@@ -352,6 +352,17 @@ export default function LandingPage() {
             신문 구경하기
           </Link>
         </div>
+
+        {/* 작가 / 스폰서 진입점 */}
+        <div className="flex gap-5 justify-center mt-5 text-xs text-ink-muted">
+          <Link href="/register/writer" className="hover:text-ink transition-colors flex items-center gap-1">
+            <span className="font-bold">✒ 작가로 지원하기</span>
+          </Link>
+          <span className="text-newsprint-300">·</span>
+          <Link href="/register/sponsor" className="hover:text-ink transition-colors flex items-center gap-1">
+            <span className="font-bold">◆ 스폰서 등록하기</span>
+          </Link>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6">

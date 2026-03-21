@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
 import { setRoleCookie } from "@/lib/auth";
 
 type PortalType = "user" | "writer" | "sponsor" | "unknown";
@@ -30,13 +31,13 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
       if (!user) {
         setPortalType("user");
-        // 혹시 남아있는 쿠키 제거
         document.cookie = "dream_role=; path=/; max-age=0";
         return;
       }
 
-      const role: string =
-        user.user_metadata?.role || user.app_metadata?.role || "user";
+      // 로컬 DB의 role이 항상 정확 — /auth/me API 사용
+      const res = await authApi.me();
+      const role: string = res.data?.role || "user";
 
       // 미들웨어가 읽을 수 있도록 쿠키 동기화
       setRoleCookie(role);
@@ -54,7 +55,6 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     detectRole();
 
-    // 로그인 / 로그아웃 등 세션 변경 감지
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {

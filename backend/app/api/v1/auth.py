@@ -91,12 +91,15 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     try:
         # 1. Supabase Admin API로 유저 생성 (Confirm Email 우회)
         # Note: email_confirm=True로 설정하여 즉시 활성화
+        allowed_roles = {"user", "writer", "sponsor"}
+        role = user_data.role if user_data.role in allowed_roles else "user"
+
         admin_client = get_supabase_admin()
         res = admin_client.auth.admin.create_user({
             "email": str(user_data.email),
             "password": user_data.password,
             "email_confirm": True,
-            "user_metadata": {"full_name": user_data.full_name}
+            "user_metadata": {"full_name": user_data.full_name, "role": role}
         })
         
         if not res or not res.user:
@@ -109,8 +112,6 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
         user = result.scalar_one_or_none()
         
         if not user:
-            allowed_roles = {"user", "writer", "sponsor"}
-            role = user_data.role if user_data.role in allowed_roles else "user"
             user = User(
                 id=uuid.UUID(supabase_user.id),
                 email=str(user_data.email),
