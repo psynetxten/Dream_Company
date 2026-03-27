@@ -39,10 +39,14 @@ class Order(Base):
     )  # pending | paid | refunded | failed
     amount_krw: Mapped[int | None] = mapped_column(Integer, nullable=True)
     
-    # Portone 결제 추적 정보
+    # Portone 결제 추적 정보 (레거시)
     merchant_uid: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
     imp_uid: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
     payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Stripe 결제 추적 정보
+    stripe_session_id: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True)
+    stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # 작가 배정
     assigned_writer_id: Mapped[uuid.UUID | None] = mapped_column(

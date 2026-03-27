@@ -69,8 +69,18 @@ export const ordersApi = {
 
 // 결제
 export const paymentApi = {
-  verify: (imp_uid: string, merchant_uid: string) =>
-    api.post("/payment/verify", null, { params: { imp_uid, merchant_uid } }),
+  /** Stripe Checkout 세션 생성 → {checkout_url} 반환 */
+  createCheckoutSession: (order_id: string) =>
+    api.post<{ checkout_url: string; session_id: string }>(
+      "/payment/checkout-session",
+      null,
+      { params: { order_id } }
+    ),
+  /** session_id로 주문 상태 조회 (결제 성공 페이지) */
+  getSession: (session_id: string) =>
+    api.get<{ order_id: string; payment_status: string; status: string; duration_days: number }>(
+      `/payment/session/${session_id}`
+    ),
 };
 
 // 작가

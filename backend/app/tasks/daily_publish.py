@@ -15,6 +15,7 @@ from app.models.order import Order
 from app.models.newspaper import Newspaper
 from app.agents.editor_in_chief.agent import EditorInChief
 from app.config import settings
+from app.models.user import User
 import structlog
 
 logger = structlog.get_logger()
@@ -145,6 +146,24 @@ async def process_single_schedule(
                 episode=schedule.episode_number,
                 headline=newspaper.headline,
             )
+
+            # 이메일 알림 발송
+            try:
+                user_result = await db.execute(select(User).where(User.id == order.user_id))
+                user = user_result.scalar_one_or_none()
+                if user and user.email and settings.RESEND_API_KEY:
+                    from app.services.email_service import send_newspaper_published
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(None, lambda: send_newspaper_published(
+                        email=user.email,
+                        full_name=user.full_name,
+                        headline=newspaper.headline or "새 신문이 도착했습니다",
+                        episode_number=schedule.episode_number,
+                        total_episodes=order.duration_days,
+                        newspaper_id=str(newspaper.id),
+                    ))
+            except Exception as e:
+                logger.warning("email_notification_failed", error=str(e))
 
         except Exception as e:
             schedule.status = "failed"

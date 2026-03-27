@@ -95,6 +95,19 @@ class Settings(BaseSettings):
     PUBLISH_TIMEZONE: str = "Asia/Seoul"
 
     # ============================
+    # Stripe 결제
+    # ============================
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
+    # ============================
+    # Resend 이메일
+    # ============================
+    RESEND_API_KEY: str = ""
+    FROM_EMAIL: str = "noreply@dreamnewspaper.com"
+    FROM_NAME: str = "꿈신문사"
+
+    # ============================
     # 소셜 로그인 (OAuth)
     # ============================
     KAKAO_CLIENT_ID: str = ""

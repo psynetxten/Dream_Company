@@ -4,12 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ordersApi, OrderCreate, paymentApi } from "@/lib/api";
 
-declare global {
-  interface Window {
-    IMP: any;
-  }
-}
-
 const DURATION_OPTIONS = [
   { days: 7, label: "7일", price: 9900, priceLabel: "9,900원", desc: "체험 시리즈" },
   { days: 14, label: "14일", price: 17900, priceLabel: "17,900원", desc: "집중 시리즈" },
@@ -32,8 +26,7 @@ export default function OrderForm() {
 
   const isFree = form.payment_type === "free";
 
-  // 무료 선택 시 기간을 7일로 고정
-  const handlePlanChange = (type: "free" | "one_time" | "subscription") => {
+  const handlePlanChange = (type: "free" | "one_time") => {
     setForm({ ...form, payment_type: type, duration_days: type === "free" ? 7 : form.duration_days });
   };
 
@@ -54,37 +47,10 @@ export default function OrderForm() {
         return;
       }
 
-      // 3. 유료 주문 — Portone 결제창 호출
-      const amount = DURATION_OPTIONS.find(o => o.days === form.duration_days)?.price || 0;
-      const { IMP } = window;
-      if (!IMP) {
-        throw new Error("결제 모듈을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
-      }
-
-      IMP.init(process.env.NEXT_PUBLIC_PORTONE_ID || "imp00000000");
-
-      IMP.request_pay({
-        pg: "html5_inicis",
-        pay_method: "card",
-        merchant_uid: orderId,
-        name: `꿈신문사 ${form.duration_days}일 시리즈`,
-        amount: amount,
-        buyer_email: "",
-        buyer_name: form.protagonist_name,
-      }, async (rsp: any) => {
-        if (rsp.success) {
-          try {
-            await paymentApi.verify(rsp.imp_uid, rsp.merchant_uid);
-            await ordersApi.start(orderId);
-            router.push("/dashboard");
-          } catch (err) {
-            setError("결제 검증에 실패했습니다. 고객센터에 문의해주세요.");
-          }
-        } else {
-          setError(`결제에 실패했습니다: ${rsp.error_msg}`);
-          setLoading(false);
-        }
-      });
+      // 3. 유료 주문 — Stripe Checkout으로 리다이렉트
+      const sessionRes = await paymentApi.createCheckoutSession(orderId);
+      const checkoutUrl = sessionRes.data.checkout_url;
+      window.location.href = checkoutUrl;
 
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -209,10 +175,17 @@ export default function OrderForm() {
                 <div className="font-bold text-lg">무료</div>
                 <div className="text-xs mt-1 opacity-80">기자단이 씁니다 · 7일</div>
               </button>
-              <div className="border-2 border-newsprint-300 bg-newsprint-100 p-4 text-center opacity-50 cursor-not-allowed">
-                <div className="font-bold text-lg text-ink-muted">프리미엄</div>
-                <div className="text-xs mt-1 text-ink-muted">전담 기자 배정 · 준비 중</div>
-              </div>
+              <button
+                type="button"
+                onClick={() => handlePlanChange("one_time")}
+                className={`border-2 p-4 text-center transition-colors ${!isFree
+                  ? "border-ink bg-ink text-newsprint-50"
+                  : "border-ink bg-newsprint-100 hover:bg-newsprint-200"
+                }`}
+              >
+                <div className="font-bold text-lg">프리미엄</div>
+                <div className="text-xs mt-1 opacity-80">카드 결제 · 7/14/30일</div>
+              </button>
             </div>
           </div>
 
