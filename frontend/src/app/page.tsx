@@ -321,34 +321,51 @@ export default function LandingPage() {
       .catch(() => {});
   }, []);
 
-  if (portalType === "writer")  return <WriterHome />;
-  if (portalType === "sponsor") return <SponsorHome />;
-
   const displayPapers = papers.length > 0 ? papers : SAMPLE_PAPERS;
   const isSample = papers.length === 0 && !loading;
+
+  // 로그인 사용자에게 보여줄 대시보드 링크
+  const dashboardHref =
+    portalType === "writer" ? "/writer/dashboard" :
+    portalType === "sponsor" ? "/sponsor/dashboard" :
+    portalType === "user" ? "/dashboard" : null;
 
   return (
     <div className="min-h-screen bg-newsprint-50 font-serif">
 
+      {/* 로그인 사용자 배너 */}
+      {dashboardHref && (
+        <div className="bg-ink text-newsprint-50 py-2 text-center text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-4">
+          <span>
+            {portalType === "writer" ? "✒ 작가 집무실" : portalType === "sponsor" ? "◆ 스폰서 센터" : "✦ 내 꿈 신문"}
+          </span>
+          <Link href={dashboardHref} className="border border-newsprint-400 px-3 py-0.5 text-[10px] hover:bg-newsprint-800 transition-colors">
+            대시보드 바로가기 →
+          </Link>
+        </div>
+      )}
+
       {/* 속보 띠 */}
-      <div className="bg-ink text-newsprint-50 py-1.5 text-center text-[11px] font-bold uppercase tracking-widest">
-        매일 오전 8시 발행 &nbsp;·&nbsp; 꿈신문사 기자단 &nbsp;·&nbsp; 당신의 꿈이 헤드라인이 됩니다
-      </div>
+      {!dashboardHref && (
+        <div className="bg-ink text-newsprint-50 py-1.5 text-center text-[11px] font-bold uppercase tracking-widest">
+          매일 오전 8시 발행 &nbsp;·&nbsp; 꿈신문사 기자단 &nbsp;·&nbsp; 당신의 꿈이 헤드라인이 됩니다
+        </div>
+      )}
 
       {/* 히어로 */}
       <header className="border-b-4 border-ink text-center px-6 pt-10 pb-8">
         <p className="text-[11px] tracking-[0.4em] uppercase text-ink-muted mb-3">Dream Newspaper &nbsp;·&nbsp; Est. 2026</p>
-        <h1 className="font-headline text-[88px] leading-none font-black tracking-[0.08em] mb-4">꿈신문사</h1>
-        <p className="text-lg text-ink-muted italic max-w-lg mx-auto mb-2">당신의 이름이 헤드라인을 장식하는 날</p>
-        <p className="text-sm text-ink-muted max-w-md mx-auto mb-8">
+        <h1 className="font-headline text-5xl sm:text-7xl md:text-[88px] leading-none font-black tracking-[0.08em] mb-4">꿈신문사</h1>
+        <p className="text-base sm:text-lg text-ink-muted italic max-w-lg mx-auto mb-2">당신의 이름이 헤드라인을 장식하는 날</p>
+        <p className="text-sm text-ink-muted max-w-md mx-auto mb-8 px-2">
           꿈이 이루어진 날, 어떤 기사가 나올까요.<br />
           꿈신문사 기자단이 그 날을 오늘의 언어로 씁니다.
         </p>
-        <div className="flex gap-3 justify-center flex-wrap">
-          <Link href="/register" className="bg-ink text-newsprint-50 px-10 py-3 font-bold text-sm uppercase tracking-widest hover:opacity-80 transition-opacity">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center px-4">
+          <Link href="/register" className="bg-ink text-newsprint-50 px-10 py-4 sm:py-3 font-bold text-sm uppercase tracking-widest hover:opacity-80 transition-opacity text-center min-h-[48px] flex items-center justify-center">
             내 신문 만들기
           </Link>
-          <Link href="/preview" className="border-2 border-ink text-ink px-10 py-3 font-bold text-sm uppercase tracking-widest hover:bg-newsprint-200 transition-colors">
+          <Link href="/preview" className="border-2 border-ink text-ink px-10 py-4 sm:py-3 font-bold text-sm uppercase tracking-widest hover:bg-newsprint-200 transition-colors text-center min-h-[48px] flex items-center justify-center">
             신문 구경하기
           </Link>
         </div>
@@ -378,22 +395,14 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* 3열 그리드 */}
-          <div className="grid grid-cols-3 grid-rows-2 gap-4" style={{ minHeight: 420 }}>
+          {/* 그리드: 모바일 1열 → 태블릿 2열 → 데스크탑 3열 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {loading ? (
-              <><SkeletonCard featured /><SkeletonCard /><SkeletonCard /></>
+              <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
             ) : (
-              <>
-                <NewspaperCard paper={displayPapers[0]} featured />
-                {displayPapers.slice(1, 3).map((p) => <NewspaperCard key={p.id} paper={p} />)}
-              </>
+              displayPapers.slice(0, 6).map((p) => <NewspaperCard key={p.id} paper={p} />)
             )}
           </div>
-          {!loading && displayPapers.length > 3 && (
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              {displayPapers.slice(3, 6).map((p) => <NewspaperCard key={p.id} paper={p} />)}
-            </div>
-          )}
 
           {/* 편집국 노트 */}
           <div className="mt-8 border-t-2 border-b-2 border-ink py-5 flex items-center gap-6">
