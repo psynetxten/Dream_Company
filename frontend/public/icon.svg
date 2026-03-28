@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 배경 (신문지 느낌의 아이보리) -->
+  <rect width="512" height="512" fill="#1a1a1a" rx="72"/>
+
+  <!-- 상단 마스트헤드 라인 -->
+  <rect x="36" y="56" width="440" height="4" fill="#f5f0e8" opacity="0.9"/>
+  <rect x="36" y="68" width="440" height="1.5" fill="#f5f0e8" opacity="0.4"/>
+
+  <!-- 꿈 글자 (메인) -->
+  <text
+    x="256" y="295"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="240"
+    font-weight="900"
+    fill="#f5f0e8"
+    text-anchor="middle"
+    dominant-baseline="middle"
+  >꿈</text>
+
+  <!-- 하단 규칙선 -->
+  <rect x="36" y="388" width="440" height="3" fill="#f5f0e8" opacity="0.9"/>
+
+  <!-- 컬럼 구분선 -->
+  <rect x="251" y="398" width="1.5" height="60" fill="#f5f0e8" opacity="0.3"/>
+
+  <!-- 신문사 서브텍스트 -->
+  <text
+    x="256" y="448"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="38"
+    font-weight="400"
+    fill="#f5f0e8"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    letter-spacing="10"
+    opacity="0.85"
+  >신문사</text>
+
+  <!-- 하단 마감 라인 -->
+  <rect x="36" y="474" width="440" height="1.5" fill="#f5f0e8" opacity="0.3"/>
+</svg>

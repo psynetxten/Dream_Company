@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 의존성 설치
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # 빌드
 COPY . .

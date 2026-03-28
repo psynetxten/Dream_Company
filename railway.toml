@@ -1,0 +1,19 @@
+# Railway 백엔드 배포 설정
+# https://railway.app 에서 "Deploy from GitHub" → 이 파일 자동 인식
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "docker/backend.Dockerfile"
+buildContext = "backend"
+
+[deploy]
+startCommand = "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# 환경변수는 Railway 대시보드에서 설정:
+# DATABASE_URL, ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY,
+# SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+# RESEND_API_KEY, FRONTEND_URL, SECRET_KEY, GOOGLE_API_KEY
