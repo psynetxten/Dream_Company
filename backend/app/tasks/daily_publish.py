@@ -16,6 +16,7 @@ from app.models.newspaper import Newspaper
 from app.agents.editor_in_chief.agent import EditorInChief
 from app.config import settings
 from app.models.user import User
+from app.core import progress_store
 import structlog
 
 logger = structlog.get_logger()
@@ -36,6 +37,10 @@ async def process_single_schedule(
             # 처리 중으로 상태 변경
             schedule.status = "processing"
             await db.flush()
+
+            await progress_store.emit(
+                str(schedule.order_id), "starting", "편집국이 꿈을 분석하고 있습니다"
+            )
 
             # 의뢰 정보 로드
             order_result = await db.execute(
@@ -62,20 +67,7 @@ async def process_single_schedule(
                 if prev_newspaper and prev_newspaper.sidebar_content:
                     previous_summary = prev_newspaper.sidebar_content.get("episode_summary", "")
 
-            # 스폰서 매칭: AdSales 에이전트로 최적 스폰서 선택
-            sponsor_company = order.target_company
-            sponsor_data = None
-            try:
-                matched = await orchestrator.ad_sales.find_sponsors(order_dict)
-                if matched:
-                    top = matched[0]
-                    sponsor_company = top.get("company_name", order.target_company)
-                    sponsor_data = top
-                    logger.info("sponsor_matched_for_publish", company=sponsor_company)
-            except Exception as e:
-                logger.warning("sponsor_match_skipped", error=str(e))
-
-            # 의뢰를 dict로 변환
+            # 의뢰를 dict로 변환 (스폰서 매칭보다 먼저 생성해야 함)
             order_dict = {
                 "id": str(order.id),
                 "protagonist_name": order.protagonist_name,
@@ -89,8 +81,29 @@ async def process_single_schedule(
                 "writer_type": order.writer_type,
             }
 
+            # 스폰서 매칭: AdSales 에이전트로 최적 스폰서 선택
+            sponsor_company = order.target_company
+            sponsor_data = None
+            try:
+                matched = await orchestrator.ad_sales.find_sponsors(order_dict)
+                if matched:
+                    top = matched[0]
+                    sponsor_company = top.get("company_name", order.target_company)
+                    sponsor_data = top
+                    logger.info("sponsor_matched_for_publish", company=sponsor_company)
+            except Exception as e:
+                logger.warning("sponsor_match_skipped", error=str(e))
+
+            await progress_store.emit(
+                str(schedule.order_id), "sponsor_matching", "맞춤 스폰서를 찾았습니다"
+            )
+
             # 신문 생성
             scheduled_date = schedule.scheduled_at.astimezone(ZoneInfo(order.timezone))
+
+            await progress_store.emit(
+                str(schedule.order_id), "writing", "기자단이 기사를 작성하고 있습니다"
+            )
 
             newspaper_content = await orchestrator.generate_with_editorial_loop(
                 order=order_dict,
@@ -132,6 +145,10 @@ async def process_single_schedule(
                 published_at=datetime.now(timezone.utc),
                 scheduled_at=schedule.scheduled_at,
             )
+            await progress_store.emit(
+                str(schedule.order_id), "quality_check", "편집장이 기사를 검수하고 있습니다"
+            )
+
             db.add(newspaper)
             await db.flush()
 
@@ -139,6 +156,14 @@ async def process_single_schedule(
             schedule.status = "completed"
             schedule.newspaper_id = newspaper.id
             schedule.executed_at = datetime.now(timezone.utc)
+
+            await progress_store.emit(
+                str(schedule.order_id),
+                "done",
+                "신문이 완성됐습니다!",
+                newspaper_id=str(newspaper.id),
+                order_id=str(schedule.order_id),
+            )
 
             logger.info(
                 "newspaper_published",

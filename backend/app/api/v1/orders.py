@@ -138,6 +138,22 @@ async def _process_order_background(order_id: str):
 
         await db.flush()
 
+        # 무료 플랜: 첫 번째 에피소드 즉시 생성
+        if order.payment_type == "free":
+            from app.tasks.daily_publish import process_single_schedule
+            import asyncio as _asyncio
+
+            first_result = await db.execute(
+                select(PublicationSchedule)
+                .where(PublicationSchedule.order_id == order.id)
+                .order_by(PublicationSchedule.episode_number)
+                .limit(1)
+            )
+            first_schedule = first_result.scalar_one_or_none()
+            if first_schedule and first_schedule.status == "pending":
+                sem = _asyncio.Semaphore(1)
+                await process_single_schedule(db, first_schedule, orchestrator, sem)
+
 
 @router.get("", response_model=list[OrderResponse])
 async def list_orders(

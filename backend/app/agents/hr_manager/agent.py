@@ -6,14 +6,12 @@ HRManager - 작가 배정 관리자
 - 작가 업무량 현황 모니터링
 """
 import json
+import re
 import uuid
 import structlog
-from google import genai
-from google.genai import types
 from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
-from app.config import settings
+from app.agents.base_agent import BaseAgent
 
 logger = structlog.get_logger()
 
@@ -43,9 +41,7 @@ class HRManager:
     """
 
     def __init__(self):
-        self._client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-        self.model_name = settings.WRITER_MODEL
-        self.agent_name = "hr-manager"
+        self._agent = BaseAgent(agent_name="hr-manager")
 
     # ─────────────────────────────────────────────────────────
     # 1. AI vs 인간 작가 선택 결정
@@ -76,12 +72,8 @@ class HRManager:
 반드시 "ai" 또는 "human" 한 단어만 반환하세요.
 """
         try:
-            response = await self._client.aio.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-            )
-            result = response.text.strip().lower()
-            writer_type = "human" if "human" in result else "ai"
+            result = await self._agent.run_async(prompt)
+            writer_type = "human" if "human" in result.strip().lower() else "ai"
             logger.info("writer_type_decided", writer_type=writer_type, order_id=order.get("id"))
             return writer_type
         except Exception as e:
@@ -207,14 +199,9 @@ class HRManager:
 }}
 """
         try:
-            response = await self._client.aio.models.generate_content(
-                model=self.model_name,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                ),
-                contents=prompt,
-            )
-            draft = json.loads(response.text)
+            result = await self._agent.run_async(prompt)
+            match = re.search(r'\{[\s\S]*\}', result)
+            draft = json.loads(match.group() if match else result)
             draft["is_ai_draft"] = True
             draft["ai_assist_note"] = "[AI 초안] 인간 작가 검토 및 편집이 필요합니다."
             logger.info("ai_draft_generated", episode=episode, order_id=order.get("id"))

@@ -5,13 +5,31 @@ import { useRouter } from "next/navigation";
 import { ordersApi, OrderCreate, paymentApi } from "@/lib/api";
 
 const DURATION_OPTIONS = [
-  { days: 7, label: "7일", price: 9900, priceLabel: "9,900원", desc: "체험 시리즈" },
-  { days: 14, label: "14일", price: 17900, priceLabel: "17,900원", desc: "집중 시리즈" },
-  { days: 30, label: "30일", price: 29900, priceLabel: "29,900원", desc: "완성 시리즈" },
+  { days: 7,  label: "7일",  priceLabel: "무료",    desc: "체험 시리즈" },
+  { days: 14, label: "14일", priceLabel: "17,900원", desc: "집중 시리즈" },
+  { days: 30, label: "30일", priceLabel: "29,900원", desc: "완성 시리즈" },
 ] as const;
+
+const FUTURE_YEARS = [2027, 2028, 2029, 2030, 2032, 2035];
+
+/* ── 상단 진행 바 ── */
+function StepBar({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex gap-1.5 px-6 pt-4 pb-2">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-1 h-1 rounded-full transition-all duration-300"
+          style={{ background: i < current ? "#1A1A1A" : "#E0DFD8" }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function OrderForm() {
   const router = useRouter();
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState<OrderCreate>({
@@ -26,229 +44,301 @@ export default function OrderForm() {
 
   const isFree = form.payment_type === "free";
 
-  const handlePlanChange = (type: "free" | "one_time") => {
-    setForm({ ...form, payment_type: type, duration_days: type === "free" ? 7 : form.duration_days });
-  };
+  /* ─── 단계별 유효성 ─── */
+  const canNext1 = form.dream_description.trim().length >= 10;
+  const canNext2 = form.protagonist_name.trim().length >= 1 && form.target_role.trim().length >= 1;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /* ─── 제출 ─── */
+  const handleSubmit = async () => {
     setLoading(true);
     setError("");
-
     try {
-      // 1. 주문 생성
       const createRes = await ordersApi.create(form);
       const orderId = createRes.data.id;
 
-      // 2. 무료 주문 — 결제 없이 바로 시작
       if (isFree) {
         await ordersApi.start(orderId);
-        router.push("/dashboard");
+        router.push(`/order/generating?orderId=${orderId}`);
         return;
       }
 
-      // 3. 유료 주문 — Stripe Checkout으로 리다이렉트
       const sessionRes = await paymentApi.createCheckoutSession(orderId);
-      const checkoutUrl = sessionRes.data.checkout_url;
-      window.location.href = checkoutUrl;
-
+      window.location.href = sessionRes.data.checkout_url;
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } }; message?: string };
-      setError(error.response?.data?.detail || error.message || "의뢰 생성에 실패했습니다.");
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      setError(e.response?.data?.detail || e.message || "의뢰 생성에 실패했습니다.");
       setLoading(false);
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
-      <div className="newspaper-page p-8">
-        {/* 폼 헤더 */}
-        <div className="text-center border-b-2 border-ink pb-4 mb-8">
-          <h1 className="font-headline text-3xl font-bold">꿈 의뢰서</h1>
-          <p className="text-sm text-ink-muted mt-1">
-            당신의 꿈을 알려주세요. 꿈신문사 기자단이 신문으로 만들어 드립니다.
+  /* ─────────── STEP 1: 꿈 입력 ─────────── */
+  if (step === 1) {
+    return (
+      <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
+        <StepBar current={1} total={3} />
+
+        <div className="px-6 pt-4 pb-2">
+          <p className="text-xs font-bold text-[#AEAAA5] uppercase tracking-widest">1 / 3</p>
+          <h1 className="font-headline font-bold text-2xl text-[#1A1A1A] mt-1 leading-tight">
+            당신의 꿈을<br />들려주세요
+          </h1>
+          <p className="text-sm text-[#6B6869] mt-1">
+            꿈신문사 기자단이 당신의 이야기를 신문으로 만듭니다
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* 주인공 이름 */}
+        <div className="flex-1 px-6 pt-4">
+          <textarea
+            value={form.dream_description}
+            onChange={(e) => setForm({ ...form, dream_description: e.target.value })}
+            placeholder="예: 구글 코리아의 AI 연구소장이 되어 세계적인 논문을 발표하고, 후배들을 이끄는 리더가 되고 싶습니다..."
+            rows={7}
+            className="app-input resize-none leading-relaxed"
+            style={{ fontFamily: "inherit" }}
+            autoFocus
+          />
+          <div className="flex justify-between mt-1.5 px-1">
+            <span className="text-xs text-[#AEAAA5]">최소 10자 이상</span>
+            <span className={`text-xs font-bold ${
+              form.dream_description.length >= 10 ? "text-[#1A1A1A]" : "text-[#AEAAA5]"
+            }`}>
+              {form.dream_description.length}자
+            </span>
+          </div>
+        </div>
+
+        <div className="px-6 pb-8 pt-4 space-y-3">
+          <button
+            onClick={() => setStep(2)}
+            disabled={!canNext1}
+            className="app-btn-primary disabled:opacity-40"
+          >
+            다음 →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─────────── STEP 2: 주인공 정보 ─────────── */
+  if (step === 2) {
+    return (
+      <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
+        <StepBar current={2} total={3} />
+
+        <div className="px-6 pt-4 pb-2">
+          <p className="text-xs font-bold text-[#AEAAA5] uppercase tracking-widest">2 / 3</p>
+          <h1 className="font-headline font-bold text-2xl text-[#1A1A1A] mt-1 leading-tight">
+            신문의 주인공은<br />누구인가요?
+          </h1>
+          <p className="text-sm text-[#6B6869] mt-1">기사에 실명으로 등장합니다</p>
+        </div>
+
+        <div className="flex-1 px-6 pt-4 space-y-3">
           <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">
-              신문에 등장할 이름 *
-            </label>
+            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">이름 *</label>
             <input
               type="text"
               value={form.protagonist_name}
               onChange={(e) => setForm({ ...form, protagonist_name: e.target.value })}
               placeholder="홍길동"
-              required
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif text-ink focus:outline-none focus:border-ink-light"
-            />
-            <p className="text-xs text-ink-muted mt-1">
-              신문 기사에 실명으로 등장합니다.
-            </p>
-          </div>
-
-          {/* 꿈 설명 */}
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">
-              당신의 꿈 *
-            </label>
-            <textarea
-              value={form.dream_description}
-              onChange={(e) => setForm({ ...form, dream_description: e.target.value })}
-              placeholder="예: 삼성전자에서 AI 연구소장이 되어 세계적인 논문을 발표하고 싶습니다. 팀을 이끌며 한국 AI 기술을 세계 최고 수준으로 끌어올리는 것이 목표입니다."
-              required
-              rows={4}
-              minLength={10}
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif text-ink focus:outline-none focus:border-ink-light resize-none"
+              className="app-input"
+              autoFocus
             />
           </div>
 
-          {/* 목표 직업 */}
           <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">
-              목표 직업/역할 *
-            </label>
+            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">목표 역할 *</label>
             <input
               type="text"
               value={form.target_role}
               onChange={(e) => setForm({ ...form, target_role: e.target.value })}
-              placeholder="예: AI 연구소장, 시리즈A 스타트업 대표, 올림픽 피아니스트"
-              required
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif text-ink focus:outline-none focus:border-ink-light"
+              placeholder="예: AI 연구소장, 시리즈A 스타트업 대표"
+              className="app-input"
             />
           </div>
 
-          {/* 목표 회사 */}
           <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">
-              목표 회사 (선택)
-            </label>
+            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">목표 회사 (선택)</label>
             <input
               type="text"
               value={form.target_company || ""}
               onChange={(e) => setForm({ ...form, target_company: e.target.value })}
-              placeholder="예: 삼성전자, 카카오, Google, 자체 스타트업"
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif text-ink focus:outline-none focus:border-ink-light"
+              placeholder="예: 삼성전자, Google, 자체 스타트업"
+              className="app-input"
             />
-            <p className="text-xs text-ink-muted mt-1">
-              입력하면 해당 기업이 기사에 자연스럽게 등장합니다.
-            </p>
           </div>
 
-          {/* 미래 연도 */}
           <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">
-              꿈이 이루어지는 연도
-            </label>
-            <select
-              value={form.future_year}
-              onChange={(e) => setForm({ ...form, future_year: Number(e.target.value) })}
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif text-ink focus:outline-none"
-            >
-              {[2027, 2028, 2029, 2030, 2032, 2035].map((year) => (
-                <option key={year} value={year}>
+            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">꿈이 이루어지는 해</label>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {FUTURE_YEARS.map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  onClick={() => setForm({ ...form, future_year: year })}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                    form.future_year === year
+                      ? "bg-[#1A1A1A] text-white"
+                      : "bg-white text-[#6B6869] border border-[#E0DFD8]"
+                  }`}
+                >
                   {year}년
-                </option>
+                </button>
               ))}
-            </select>
-          </div>
-
-          {/* 구분선 */}
-          <hr className="news-divider" />
-
-          {/* 플랜 선택 */}
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-3">
-              플랜 선택 *
-            </label>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <button
-                type="button"
-                onClick={() => handlePlanChange("free")}
-                className={`border-2 p-4 text-center transition-colors ${isFree
-                  ? "border-ink bg-ink text-newsprint-50"
-                  : "border-ink bg-newsprint-100 hover:bg-newsprint-200"
-                }`}
-              >
-                <div className="font-bold text-lg">무료</div>
-                <div className="text-xs mt-1 opacity-80">기자단이 씁니다 · 7일</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePlanChange("one_time")}
-                className={`border-2 p-4 text-center transition-colors ${!isFree
-                  ? "border-ink bg-ink text-newsprint-50"
-                  : "border-ink bg-newsprint-100 hover:bg-newsprint-200"
-                }`}
-              >
-                <div className="font-bold text-lg">프리미엄</div>
-                <div className="text-xs mt-1 opacity-80">카드 결제 · 7/14/30일</div>
-              </button>
             </div>
           </div>
+        </div>
 
-          {/* 시리즈 기간 선택 */}
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-3">
-              시리즈 기간 선택 *
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {DURATION_OPTIONS.map((opt) => {
-                const locked = isFree && opt.days !== 7;
-                const selected = form.duration_days === opt.days;
-                return (
-                  <button
-                    key={opt.days}
-                    type="button"
-                    disabled={locked}
-                    onClick={() => !locked && setForm({ ...form, duration_days: opt.days })}
-                    className={`border-2 p-3 text-center transition-colors relative ${
-                      locked
-                        ? "border-newsprint-300 bg-newsprint-100 opacity-40 cursor-not-allowed"
-                        : selected
-                        ? "border-ink bg-ink text-newsprint-50"
-                        : "border-ink bg-newsprint-100 hover:bg-newsprint-200"
-                    }`}
-                  >
-                    <div className="font-bold text-xl">{opt.label}</div>
-                    {locked && (
-                      <div className="text-[10px] font-bold uppercase tracking-wide mt-0.5 text-ink-muted">프리미엄</div>
-                    )}
-                    {!locked && !isFree && (
-                      <div className="text-xs mt-1 opacity-80">{opt.priceLabel}</div>
-                    )}
-                    {!locked && (
-                      <div className="text-xs opacity-60 mt-0.5">{opt.desc}</div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 오류 메시지 */}
-          {error && (
-            <div className="border-2 border-red-500 bg-red-50 p-3 text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* 제출 버튼 */}
+        <div className="px-6 pb-8 pt-4 space-y-3">
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-ink text-newsprint-50 py-4 font-bold text-lg tracking-widest uppercase hover:bg-ink-light transition-colors disabled:opacity-50"
+            onClick={() => setStep(3)}
+            disabled={!canNext2}
+            className="app-btn-primary disabled:opacity-40"
           >
-            {loading ? "꿈을 준비하는 중..." : isFree ? "무료로 시작하기" : "결제하고 시작하기"}
+            다음 →
           </button>
-
-          <p className="text-xs text-center text-ink-muted">
-            제출하면 내일 오전 8시부터 꿈신문이 발행됩니다.
-          </p>
+          <button
+            onClick={() => setStep(1)}
+            className="app-btn-secondary"
+          >
+            ← 이전
+          </button>
         </div>
       </div>
-    </form>
+    );
+  }
+
+  /* ─────────── STEP 3: 플랜 선택 ─────────── */
+  return (
+    <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
+      <StepBar current={3} total={3} />
+
+      <div className="px-6 pt-4 pb-2">
+        <p className="text-xs font-bold text-[#AEAAA5] uppercase tracking-widest">3 / 3</p>
+        <h1 className="font-headline font-bold text-2xl text-[#1A1A1A] mt-1 leading-tight">
+          어떻게<br />시작할까요?
+        </h1>
+      </div>
+
+      <div className="flex-1 px-6 pt-4 space-y-3">
+        {/* 무료 플랜 */}
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, payment_type: "free", duration_days: 7 })}
+          className={`w-full app-card p-5 text-left transition-all ${
+            isFree ? "ring-2 ring-[#1A1A1A]" : "active:bg-[#F2F1EB]"
+          }`}
+        >
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <span className="badge-active mb-2 inline-block">무료</span>
+              <h3 className="font-headline font-bold text-[#1A1A1A] text-base">기자단 체험</h3>
+              <p className="text-xs text-[#6B6869] mt-0.5">7일 시리즈 · 결제 없이 즉시 시작</p>
+            </div>
+            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+              isFree ? "border-[#1A1A1A] bg-[#1A1A1A]" : "border-[#E0DFD8]"
+            }`}>
+              {isFree && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-3 text-xs text-[#AEAAA5] mt-3">
+            <span>✓ AI 기자단 작성</span>
+            <span>✓ 매일 아침 발행</span>
+            <span>✓ 스폰서 자동 매칭</span>
+          </div>
+        </button>
+
+        {/* 프리미엄 플랜 */}
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, payment_type: "one_time", duration_days: form.duration_days === 7 ? 14 : form.duration_days })}
+          className={`w-full app-card p-5 text-left transition-all ${
+            !isFree ? "ring-2 ring-[#1A1A1A]" : "active:bg-[#F2F1EB]"
+          }`}
+        >
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <span className="bg-[#1A1A1A] text-white text-xs font-bold px-2.5 py-1 rounded-full mb-2 inline-block">프리미엄</span>
+              <h3 className="font-headline font-bold text-[#1A1A1A] text-base">전담 기자 시리즈</h3>
+              <p className="text-xs text-[#6B6869] mt-0.5">14일 / 30일 · 카드 결제</p>
+            </div>
+            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+              !isFree ? "border-[#1A1A1A] bg-[#1A1A1A]" : "border-[#E0DFD8]"
+            }`}>
+              {!isFree && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-3 text-xs text-[#AEAAA5] mt-3">
+            <span>✓ 전담 기자 배정</span>
+            <span>✓ 더 깊은 이야기</span>
+            <span>✓ 우선 발행</span>
+          </div>
+        </button>
+
+        {/* 기간 선택 (프리미엄만) */}
+        {!isFree && (
+          <div className="app-card p-4">
+            <p className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-3">시리즈 기간</p>
+            <div className="grid grid-cols-2 gap-2">
+              {DURATION_OPTIONS.filter((o) => o.days !== 7).map((opt) => (
+                <button
+                  key={opt.days}
+                  type="button"
+                  onClick={() => setForm({ ...form, duration_days: opt.days })}
+                  className={`p-3 rounded-xl text-center transition-all border ${
+                    form.duration_days === opt.days
+                      ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                      : "bg-white text-[#1A1A1A] border-[#E0DFD8]"
+                  }`}
+                >
+                  <div className="font-headline font-bold text-base">{opt.label}</div>
+                  <div className="text-xs mt-0.5 opacity-70">{opt.priceLabel}</div>
+                  <div className="text-xs opacity-50">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-[#CC2200]">
+            {error}
+          </div>
+        )}
+      </div>
+
+      <div className="px-6 pb-8 pt-4 space-y-3">
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className="app-btn-primary disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+              </svg>
+              꿈을 준비하는 중...
+            </span>
+          ) : isFree ? "무료로 시작하기 🗞" : "결제하고 시작하기"}
+        </button>
+        <button onClick={() => setStep(2)} className="app-btn-secondary">
+          ← 이전
+        </button>
+        <p className="text-center text-xs text-[#AEAAA5]">
+          제출 후 내일 오전 8시부터 신문이 발행됩니다
+        </p>
+      </div>
+    </div>
   );
 }
