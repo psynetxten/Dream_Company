@@ -1,8 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.engine.url import URL as SaURL
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+from urllib.parse import urlparse, unquote
 import structlog
 
 logger = structlog.get_logger()
@@ -15,6 +17,7 @@ _engine = None
 _session_factory = None
 
 def _get_db_url() -> str:
+    """Return normalized psycopg URL string (for display/alembic fallback)."""
     db_url = settings.DATABASE_URL
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
@@ -24,11 +27,30 @@ def _get_db_url() -> str:
         db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
     return db_url
 
+def _parse_db_url() -> SaURL:
+    """Parse DATABASE_URL safely using Python's urlparse (rpartition @ strategy),
+    then build a SQLAlchemy URL object. This correctly handles passwords containing @."""
+    raw = settings.DATABASE_URL
+    # Normalize to plain postgresql:// so urlparse can extract components
+    for prefix in ["postgresql+psycopg://", "postgresql+asyncpg://", "postgres://"]:
+        if raw.startswith(prefix):
+            raw = "postgresql://" + raw[len(prefix):]
+            break
+    p = urlparse(raw)
+    return SaURL.create(
+        "postgresql+psycopg",
+        username=p.username,
+        password=unquote(p.password or ""),
+        host=p.hostname,
+        port=p.port,
+        database=(p.path or "/postgres").lstrip("/"),
+    )
+
 def _get_engine():
     global _engine
     if _engine is None:
         _engine = create_async_engine(
-            _get_db_url(),
+            _parse_db_url(),
             echo=settings.DEBUG,
             pool_pre_ping=True,
             pool_size=5,

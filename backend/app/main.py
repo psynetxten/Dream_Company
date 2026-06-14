@@ -81,22 +81,33 @@ async def ping():
 @app.get("/api/debug-db")
 async def debug_db():
     import psycopg
-    from app.database import _get_db_url
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, unquote
+    from app.config import settings
 
-    converted_url = _get_db_url()
-    parsed = urlparse(converted_url)
-    native_url = converted_url.replace("postgresql+psycopg://", "postgresql://")
+    raw = settings.DATABASE_URL
+    for prefix in ["postgresql+psycopg://", "postgresql+asyncpg://", "postgres://"]:
+        if raw.startswith(prefix):
+            raw = "postgresql://" + raw[len(prefix):]
+            break
+    p = urlparse(raw)
 
     try:
-        conn = await psycopg.AsyncConnection.connect(native_url, connect_timeout=10)
+        conn = await psycopg.AsyncConnection.connect(
+            host=p.hostname,
+            port=p.port,
+            user=p.username,
+            password=unquote(p.password or ""),
+            dbname=(p.path or "/postgres").lstrip("/"),
+            connect_timeout=10,
+        )
         await conn.close()
         db_result = "SUCCESS"
     except Exception as e:
         db_result = f"FAILED: {type(e).__name__}: {e}"
 
     return {
-        "host": parsed.hostname,
+        "host": p.hostname,
+        "port": p.port,
         "driver": "psycopg3",
         "db_connect": db_result,
     }
