@@ -80,36 +80,30 @@ async def ping():
 
 @app.get("/api/debug-db")
 async def debug_db():
-    import socket
-    import asyncio
+    import asyncpg
     from app.config import settings
     from app.database import _get_db_url
     from urllib.parse import urlparse
 
-    raw_url = settings.DATABASE_URL
     converted_url = _get_db_url()
     parsed = urlparse(converted_url)
-    host = parsed.hostname
 
-    # 동기 DNS
-    try:
-        resolved_sync = list({r[4][0] for r in socket.getaddrinfo(host, 5432)})
-    except Exception as e:
-        resolved_sync = [f"SYNC ERROR: {e}"]
+    # asyncpg 네이티브 URL로 변환 (postgresql+asyncpg:// → postgresql://)
+    native_url = converted_url.replace("postgresql+asyncpg://", "postgresql://")
 
-    # 비동기 DNS
     try:
-        loop = asyncio.get_event_loop()
-        infos = await loop.getaddrinfo(host, 5432, type=socket.SOCK_STREAM)
-        resolved_async = list({r[4][0] for r in infos})
+        conn = await asyncpg.connect(native_url, ssl="require", timeout=10)
+        await conn.close()
+        db_result = "SUCCESS"
     except Exception as e:
-        resolved_async = [f"ASYNC ERROR: {e}"]
+        db_result = f"FAILED: {type(e).__name__}: {e}"
 
     return {
-        "raw_url_host": urlparse(raw_url).hostname,
-        "converted_url_host": host,
-        "resolved_sync": resolved_sync,
-        "resolved_async": resolved_async,
+        "host": parsed.hostname,
+        "port": parsed.port,
+        "user": parsed.username,
+        "db": parsed.path.lstrip("/"),
+        "db_connect": db_result,
     }
 
 
