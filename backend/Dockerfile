@@ -20,4 +20,4 @@ COPY . .
 ENV PORT=8000
 
 # alembic 실패해도 uvicorn은 무조건 시작 (DB 연결 오류 시 앱은 뜨고 로그로 확인)
-CMD uv run alembic upgrade head; uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+CMD uv run alembic upgrade head; uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT --loop asyncio
