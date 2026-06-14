@@ -23,9 +23,11 @@ def get_url():
     url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
     # postgres:// → postgresql+asyncpg:// (Supabase/Heroku 표준 URL 자동 변환)
     if url.startswith("postgres://"):
-        url = "postgresql+asyncpg://" + url[len("postgres://"):]
-    elif url.startswith("postgresql://") and "+asyncpg" not in url:
-        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        url = "postgresql+psycopg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://") and "psycopg" not in url and "asyncpg" not in url:
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    elif url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
     return url
 
 
