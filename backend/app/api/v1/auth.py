@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 import uuid
+import asyncio
+from functools import partial
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import timedelta, datetime, timezone
@@ -12,7 +14,6 @@ from app.core.exceptions import raise_conflict, raise_unauthorized
 from app.config import settings
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.supabase_client import supabase, get_supabase_admin
-from jose import jwt as jose_jwt, JWTError
 import structlog
 
 log = structlog.get_logger()
@@ -27,40 +28,26 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Supabase JWT 로컬 검증 (네트워크 호출 없이 빠르게)"""
+    """Supabase JWT 검증 — run_in_executor로 블로킹 호출을 스레드풀에서 실행 (Render 503 방지)"""
     token = credentials.credentials
 
-    if settings.SUPABASE_JWT_SECRET:
-        # 로컬 검증: 네트워크 호출 없이 즉시 검증 (Render 503 방지)
-        try:
-            payload = jose_jwt.decode(
-                token,
-                settings.SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-            email: str = payload.get("email", "")
-            user_id: str = payload.get("sub", "")
-            if not email or not user_id:
-                raise_unauthorized("Token missing required fields")
-            metadata = payload.get("user_metadata") or {}
-        except JWTError as e:
-            log.error("jwt_local_verify_failed", error=str(e))
-            raise_unauthorized(f"Invalid token: {str(e)}")
-    else:
-        # 폴백: Supabase API 호출 (SUPABASE_JWT_SECRET 미설정 시)
-        try:
-            user_res = supabase.auth.get_user(token)
-            if not user_res or not user_res.user:
-                log.error("auth_failed", token_preview=token[:10] + "...")
-                raise_unauthorized("Invalid session or user not found")
-        except Exception as e:
-            log.error("auth_exception", error=str(e), token_preview=token[:10] + "...")
-            raise_unauthorized(f"Auth error: {str(e)}")
-        supabase_user = user_res.user
-        email = supabase_user.email
-        user_id = supabase_user.id
-        metadata = supabase_user.user_metadata or {}
+    try:
+        # 동기 Supabase 호출을 스레드풀에서 실행해 이벤트루프 블로킹 방지
+        loop = asyncio.get_event_loop()
+        user_res = await loop.run_in_executor(None, partial(supabase.auth.get_user, token))
+        if not user_res or not user_res.user:
+            log.error("auth_failed", token_preview=token[:10] + "...")
+            raise_unauthorized("Invalid session or user not found")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
+        log.error("auth_exception", error=str(e), token_preview=token[:10] + "...")
+        raise_unauthorized(f"Auth error: {str(e)}")
+
+    supabase_user = user_res.user
+    email = supabase_user.email
+    user_id = supabase_user.id
+    metadata = supabase_user.user_metadata or {}
 
     # DB에 해당 유저가 있는지 확인
     result = await db.execute(select(User).where(User.email == email))
