@@ -78,6 +78,22 @@ async def ping():
     return {"status": "pong", "version": "0.2.0", "service": "dream-newspaper"}
 
 
+@app.get("/api/debug-db")
+async def debug_db():
+    import socket
+    from app.config import settings
+    from urllib.parse import urlparse
+    raw_url = settings.DATABASE_URL
+    parsed = urlparse(raw_url)
+    host = parsed.hostname
+    try:
+        resolved = socket.getaddrinfo(host, 5432)
+        addrs = list({r[4][0] for r in resolved})
+    except Exception as e:
+        addrs = [f"DNS ERROR: {e}"]
+    return {"db_host": host, "resolved_addresses": addrs}
+
+
 # ============================
 # 헬스체크
 # ============================
