@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     NEXT_PUBLIC_SUPABASE_ANON_KEY: str = ""
 
     SUPABASE_SERVICE_ROLE_KEY: str = "" # Backend only
+    SUPABASE_JWT_SECRET: str = ""       # For local JWT verification (Settings → API → JWT Secret)
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_CORS_ORIGINS: str = '["http://localhost:3000"]'
 
