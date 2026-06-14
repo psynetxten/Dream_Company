@@ -78,40 +78,6 @@ async def ping():
     return {"status": "pong", "version": "0.2.0", "service": "dream-newspaper"}
 
 
-@app.get("/api/debug-db")
-async def debug_db():
-    import psycopg
-    from urllib.parse import urlparse, unquote
-    from app.config import settings
-
-    raw = settings.DATABASE_URL
-    for prefix in ["postgresql+psycopg://", "postgresql+asyncpg://", "postgres://"]:
-        if raw.startswith(prefix):
-            raw = "postgresql://" + raw[len(prefix):]
-            break
-    p = urlparse(raw)
-
-    try:
-        conn = await psycopg.AsyncConnection.connect(
-            host=p.hostname,
-            port=p.port,
-            user=p.username,
-            password=unquote(p.password or ""),
-            dbname=(p.path or "/postgres").lstrip("/"),
-            connect_timeout=10,
-        )
-        await conn.close()
-        db_result = "SUCCESS"
-    except Exception as e:
-        db_result = f"FAILED: {type(e).__name__}: {e}"
-
-    return {
-        "host": p.hostname,
-        "port": p.port,
-        "driver": "psycopg3",
-        "db_connect": db_result,
-    }
-
 
 # ============================
 # 헬스체크
