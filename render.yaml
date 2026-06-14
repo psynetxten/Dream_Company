@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: dream-newspaper-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore
+    envVars:
+      # === 필수 (Render 대시보드에서 직접 입력) ===
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        value: https://qzlcpfrhwjgjafdafrva.supabase.co
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      # === 앱 설정 ===
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: FRONTEND_URL
+        value: https://dream-newspaper-phi.vercel.app
+      - key: BACKEND_CORS_ORIGINS
+        value: '["https://dream-newspaper-phi.vercel.app","https://dream-newspaper-junholee94s-projects.vercel.app"]'
+      # === AI 모델 ===
+      - key: ORCHESTRATOR_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: WRITER_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: SPONSOR_MODEL
+        value: claude-haiku-4-5-20251001
+      # === 스케줄러 ===
+      - key: PUBLISH_HOUR
+        value: "8"
+      - key: PUBLISH_MINUTE
+        value: "0"
+      - key: PUBLISH_TIMEZONE
+        value: Asia/Seoul
+      # === Google (벡터 임베딩, 선택사항) ===
+      - key: GOOGLE_API_KEY
+        sync: false
