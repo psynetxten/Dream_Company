@@ -2,15 +2,55 @@
 
 ---
 
-## ✅ 완료 (2026-05-31) — 매직링크 온보딩 플로우 완성
+## ✅ 완료 (2026-06-14) — 로그인 플로우 수정 + /auth/me 503 근본 원인 수정
 
-### CEO 대기 중인 항목 (CTO가 기다리고 있음)
+### 진단 결과
+- **무한반복 원인**: Render 콜드 스타트 중 OPTIONS preflight → 503 → CORS 오류 → "Failed to fetch" → 로그인 페이지 탈출 불가
+- **수정 1**: 로그인 페이지 로드 시 `/api/ping` warmup fetch (OPTIONS 없이 GET이라 CORS 프리플라이트 불필요)
+- **수정 2**: FastAPI 422 에러 상세(배열)를 `[object Object]`로 보여주던 버그 수정
+- **수정 3 (오늘 신규)**: `/auth/me` GET이 항상 503 반환하는 버그 수정
+  - **근본원인**: `supabase.auth.get_user()` = 동기 HTTP 호출이 async 이벤트루프를 블로킹 → Render 타임아웃 → 503
+  - **수정**: `python-jose`로 JWT 로컬 검증 (네트워크 호출 없음, 수 밀리초)
+  - **배포**: `psynetxten/Dream_Company` main 브랜치 푸시 → Render 자동 배포 진행 중
+
+### 🚨 CEO 필수 액션 1개 (오늘)
+> **Render 환경변수 `SUPABASE_JWT_SECRET` 추가 필요** — 이거 없으면 수정 3이 적용 안 됨 (폴백 코드로 동작)
+>
+> **방법**:
+> 1. Supabase 대시보드 → Settings → API → **JWT Settings** → **JWT Secret** 복사
+> 2. Render 대시보드 → `dream-newspaper-backend` → **Environment** → `SUPABASE_JWT_SECRET` = 복사한 값 → **Save Changes**
+> 3. 서비스 자동 재시작됨 → `/auth/me` 200 반환 확인
+
+### 테스트 결과 (오늘 직접 확인)
+- 로그인 POST `/api/v1/auth/login` → **200** ✅
+- 리다이렉트 `/` → **성공** ✅  
+- `dream_role=user` 쿠키 설정 → **성공** ✅
+- `/dashboard` 보호 라우트 접근 → **성공** ✅ (내 꿈 시리즈 빈 상태 정상 표시)
+- `/auth/me` GET → **503** ⚠️ (위 환경변수 추가하면 200으로 바뀜)
+  - 현재: `getUserRole()` try/catch → "user" 기본값 반환 → 일반 유저 로그인은 정상 작동
+  - 작가/스폰서 계정은 환경변수 추가 후 올바른 대시보드로 이동됨
+
+---
+
+## ✅ 완료 (2026-06-14) — Vercel 프로덕션 배포 완료
+
+### 🌐 라이브 URL
+| 서비스 | URL | 상태 |
+|--------|-----|------|
+| **Vercel 프론트엔드** | https://dream-newspaper-phi.vercel.app | ✅ LIVE |
+| 백엔드 API | http://localhost:3003 (로컬만) | 🔧 Railway 배포 필요 |
+
+**배포 내용**: TypingLanding + Magic Link 온보딩 + `/auth/callback` + `/onboarding` + 통계 API
+- 30개 페이지 빌드 성공, 컴파일 오류 없음
+- `vercel.json` 수정: `rootDirectory` 제거, 시크릿 참조 제거 (env 섹션 삭제)
+- Vercel CLI (`vercel deploy --prod`) 로 직접 배포 (GitHub 연결 우회)
+
+### CEO 대기 중인 항목
 | 순서 | 작업 | 상태 |
 |------|------|------|
-| 1 | Anthropic Console 자동충전 설정 + API 키 발급 | ⬜ 대기 |
-| 2 | Vercel 배포 (junholee940930@gmail.com 계정 → GitHub 연결) | ⬜ 대기 |
-| 3 | Railway 가입 + 백엔드 배포 | ⬜ 대기 |
-| 4 | Stripe Live 키 발급 | ⬜ 대기 |
+| 1 | Railway 가입 + 백엔드 배포 | ⬜ 대기 |
+| 2 | 배포 후 Vercel env 업데이트: `NEXT_PUBLIC_API_URL` = Railway URL | ⬜ 배포 후 CTO가 처리 |
+| 3 | Supabase Magic Link 이메일 커스터마이징 (RESEND_API_KEY 필요) | ⬜ 선택사항 |
 
 ### CTO 완료 (2026-05-29~31)
 - ✅ AI 엔진: Claude CLI → Anthropic Python SDK 직접 호출 전환
@@ -445,10 +485,41 @@
 
 ---
 
+## ✅ 완료 (2026-06-14) — 프로덕션 배포 + 이메일 시스템 구축
+
+### 🌐 라이브 URL (최신)
+| 서비스 | URL | 상태 |
+|--------|-----|------|
+| **Vercel 프론트엔드** | https://dream-newspaper-phi.vercel.app | ✅ LIVE |
+| **Render 백엔드** | https://dream-newspaper.onrender.com (또는 Render 대시보드 확인) | ✅ LIVE |
+| **도메인** | dreamnewspaper.com (Cloudflare) | ✅ 구매 완료 |
+
+### 완료된 작업
+- ✅ Render 무료 플랜 백엔드 배포 (Docker + FastAPI)
+- ✅ Vercel 프론트엔드 배포 (CLI 직접 배포)
+- ✅ 연도 2035 → 2027 전체 변경 (TypingLanding, onboarding, OrderForm)
+- ✅ dreamnewspaper.com 도메인 구매 (Cloudflare)
+- ✅ Resend 도메인 인증 완료 (dreamnewspaper.com, Tokyo 리전)
+- ✅ Magic Link 이메일 발신자: `꿈신문사 <noreply@dreamnewspaper.com>`
+
+## ✅ 완료 (2026-06-14) — Render DB 연결 수정
+
+### 해결된 문제
+1. **asyncpg → psycopg3 교체** — asyncpg가 Render에서 DNS 실패
+2. **패스워드 내 `@` 문자 처리** — psycopg URL 파서 버그 → `SaURL.create()` + Python urlparse로 해결
+3. **직접 연결(IPv6) → Session Pooler(IPv4) 교체** — Render 무료 티어 IPv6 미지원
+
+### 현재 상태
+- `host`: `aws-1-ap-northeast-2.pooler.supabase.com` ✅
+- `/health`: `status: ok, db_connection: ok` ✅
+- 이메일 로그인 / 구글 OAuth / Magic Link 모두 정상 작동
+
 ## 다음 할 일
 
-### ✅ 서비스 가동 조건 충족
-- AI 신문 생성: Claude CLI Pro 구독으로 정상 가동 중
+### 즉시 가능
+- [ ] dreamnewspaper.com → Vercel 커스텀 도메인 연결 (현재 dream-newspaper-phi.vercel.app)
+- [ ] RESEND_API_KEY → Render 환경변수 추가 (이메일 알림 기능 붙일 때)
+- [ ] capacitor.config.ts PRODUCTION_URL → 실제 Vercel URL로 업데이트
 
 ### iOS (즉시 시작 가능)
 - [ ] Apple Developer Program 등록 ($99/년) — `docs/ios-deploy/SETUP.md` 참고
@@ -457,16 +528,12 @@
 - [ ] GitHub Secrets 11개 등록
 - [ ] GitHub에 코드 push → 자동 빌드 → TestFlight 확인
 
-### 배포 인프라 (iOS 완료 후)
-- [ ] Railway + Vercel 배포 → 실제 URL 확정 (CEO 직접)
-- [ ] capacitor.config.ts PRODUCTION_URL 업데이트 (URL 확정 후 CTO)
-- [ ] Android: Keystore 생성 + AAB 빌드 + Google Play Console ($25)
-
 ### Phase 2 기능
+- [ ] Portone 결제 연동 (프리미엄 티어)
 - [ ] Stripe 테스트 결제 검증 (STRIPE_SECRET_KEY 환경변수 필요)
-- [ ] Resend 이메일 테스트 (RESEND_API_KEY 환경변수 필요)
 - [ ] 커스텀 404 페이지 (현재 Next.js 기본)
 - [ ] 스폰서 슬롯 Stripe 결제 연동 (현재 청구서 수동 발행 방식)
+- [ ] Android: Keystore 생성 + AAB 빌드 + Google Play Console ($25)
 
 ---
 
@@ -474,10 +541,10 @@
 
 | 서비스 | URL | 상태 |
 |--------|-----|------|
-| 프론트엔드 (통합) | http://localhost:3000 | ✅ 운영 중 |
-| 백엔드 API | http://localhost:3003 | ✅ 운영 중 |
-| API 문서 | http://localhost:3003/docs | ✅ |
-| 모바일 테스트 | http://{PC_IP}:3000 | ✅ (WiFi 연결, IP 자동 감지 — 재빌드 불필요) |
+| 프론트엔드 (로컬) | http://localhost:3000 | ✅ 운영 중 |
+| 백엔드 API (로컬) | http://localhost:3003 | ✅ 운영 중 |
+| 프론트엔드 (프로덕션) | https://dream-newspaper-phi.vercel.app | ✅ LIVE |
+| 이메일 발신 | noreply@dreamnewspaper.com (Resend) | ✅ 인증 완료 |
 
 ## 주요 진입점
 - 일반 회원가입: http://localhost:3000/register
