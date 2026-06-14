@@ -11,7 +11,7 @@ const DURATION_OPTIONS = [
   { days: 30, label: "30일", credits: 30, desc: "완성" },
 ] as const;
 
-const FUTURE_YEARS = [2027, 2028, 2029, 2030, 2032, 2035];
+const FUTURE_YEARS = [2027, 2028, 2029, 2030];
 
 function StepBar({ current, total }: { current: number; total: number }) {
   return (

@@ -55,7 +55,7 @@ export default function OnboardingPage() {
           target_role: dream.trim().slice(0, 200),
           duration_days: 7,
           payment_type: "free",
-          future_year: 2035,
+          future_year: 2027,
           supporting_people: [],
         }),
       });
@@ -132,7 +132,7 @@ export default function OnboardingPage() {
         {/* 꿈 입력 */}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <label style={{ fontSize: "0.85rem", color: "#888", fontFamily: "system-ui, sans-serif", letterSpacing: "0.05em" }}>
-            2035년의 {name || "당신"}씨는 어떤 삶을 살고 있나요?
+            2027년의 {name || "당신"}씨는 어떤 삶을 살고 있나요?
           </label>
           <textarea
             value={dream}

@@ -11,7 +11,7 @@ type Phase =
   | "email"
   | "sent";
 
-const PREFIX = "2035년 봄, ";
+const PREFIX = "2027년 봄, ";
 const SUFFIX =
   "씨의 이름이 처음으로 뉴스 첫 면에 실렸다. " +
   "꿈신문사 기자단의 단독 취재로 밝혀진 이 소식에 수십만 명이 뜨겁게 반응했다. " +
