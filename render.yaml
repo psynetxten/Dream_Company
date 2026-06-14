@@ -15,7 +15,7 @@ services:
       - key: SUPABASE_URL
         value: https://qzlcpfrhwjgjafdafrva.supabase.co
       - key: SUPABASE_ANON_KEY
-        sync: false
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bGNwZnJod2pnamFmZGFmcnZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDczNjEsImV4cCI6MjA4Njk4MzM2MX0.18j-qj1nRO_5Fg8VnKKtMZx3eydsEcF70FDnoPV2A_o
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: SECRET_KEY
