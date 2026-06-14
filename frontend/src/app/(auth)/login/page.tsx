@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,11 @@ function LoginForm() {
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ email: "", password: "" });
+
+  // 페이지 로드 시 백엔드 워밍업 (Render 콜드 스타트 방지)
+  useEffect(() => {
+    fetch(`${getApiBaseUrl()}/api/ping`).catch(() => {});
+  }, []);
 
   const handleOAuth = async (provider: "kakao" | "google") => {
     setOauthLoading(provider);
