@@ -19,4 +19,5 @@ COPY . .
 # Render는 $PORT 환경변수를 주입함 (기본 10000)
 ENV PORT=8000
 
-CMD uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# alembic 실패해도 uvicorn은 무조건 시작 (DB 연결 오류 시 앱은 뜨고 로그로 확인)
+CMD uv run alembic upgrade head; uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
