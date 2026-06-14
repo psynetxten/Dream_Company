@@ -18,12 +18,15 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    """환경변수에서 DB URL 가져오기"""
+    """환경변수에서 DB URL 가져오기 (드라이버 prefix 자동 정규화)"""
     import os
-    return os.getenv(
-        "DATABASE_URL",
-        config.get_main_option("sqlalchemy.url")
-    )
+    url = os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    # postgres:// → postgresql+asyncpg:// (Supabase/Heroku 표준 URL 자동 변환)
+    if url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://") and "+asyncpg" not in url:
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    return url
 
 
 def run_migrations_offline() -> None:
