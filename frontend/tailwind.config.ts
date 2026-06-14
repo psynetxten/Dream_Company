@@ -37,8 +37,28 @@ const config: Config = {
           "text-muted": "#8e8e9a",
           "node-bg": "#1e1e26",
         },
+        // 앱 디자인 시스템 컬러
+        app: {
+          bg: "#F4F3EE",
+          surface: "#FFFFFF",
+          "surface-2": "#F2F1EB",
+          border: "#E0DFD8",
+          text: "#1A1A1A",
+          "text-2": "#6B6869",
+          "text-3": "#AEAAA5",
+          red: "#CC2200",
+          green: "#22C55E",
+          orange: "#F59E0B",
+        },
       },
       fontFamily: {
+        sans: [
+          "Noto Serif KR",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif",
+        ],
         serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
         headline: ["'Noto Serif KR'", "Georgia", "serif"],
       },

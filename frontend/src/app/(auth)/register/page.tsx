@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerAndLogin } from "@/lib/auth";
+import AppBar from "@/components/AppBar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ email: "", password: "", full_name: "" });
@@ -18,78 +17,105 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      await registerAndLogin(form.email, form.password, form.full_name, "user", API_URL);
-    } catch (err: any) {
-      setError(err.message || "회원가입 중 오류가 발생했습니다.");
+      await registerAndLogin(form.email, form.password, form.full_name, "user", API_URL, "/onboarding");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "회원가입 중 오류가 발생했습니다.";
+      setError(message);
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8">
-      <div className="newspaper-page w-full max-w-md p-8">
+    <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
+      <AppBar showBack backHref="/login" />
 
-        <div className="text-center border-b-2 border-ink pb-4 mb-8">
-          <Link href="/" className="font-headline text-3xl font-bold">꿈신문사</Link>
-          <p className="text-sm text-ink-muted mt-1">독자 가입 — 내 꿈 신문 시작하기</p>
+      <div className="pt-safe-header flex-1 flex flex-col px-6 py-6 max-w-sm mx-auto w-full">
+        {/* 타이틀 */}
+        <div className="mb-8 pt-2">
+          <p className="font-headline font-bold text-sm text-[#AEAAA5] mb-1">꿈신문사</p>
+          <h1 className="font-headline font-bold text-3xl text-[#1A1A1A] leading-tight">
+            계정 만들기
+          </h1>
+          <p className="text-sm text-[#6B6869] mt-2">기자단에 합류하세요</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* 폼 */}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="text"
+            value={form.full_name}
+            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+            placeholder="이름"
+            required
+            className="app-input"
+          />
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="이메일"
+            required
+            className="app-input"
+          />
           <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">이름</label>
-            <input
-              type="text"
-              value={form.full_name}
-              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-              placeholder="홍길동"
-              required
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">이메일</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-widest mb-2">비밀번호</label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="비밀번호"
               required
               minLength={8}
-              className="w-full border-2 border-ink bg-newsprint-50 px-4 py-2 font-serif focus:outline-none"
+              className="app-input"
             />
-            <p className="text-xs text-ink-muted mt-1">최소 8자 이상</p>
+            <p className="text-xs text-[#AEAAA5] mt-1.5 px-1">최소 8자 이상</p>
           </div>
 
           {error && (
-            <div className="border border-red-500 bg-red-50 p-2 text-red-600 text-sm">{error}</div>
+            <p className="text-sm text-[#CC2200] px-1">{error}</p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-ink text-newsprint-50 py-3 font-bold uppercase tracking-widest hover:bg-ink/80 transition-colors disabled:opacity-50"
-          >
-            {loading ? "가입 중..." : "꿈 신문 시작하기"}
-          </button>
+          <div className="pt-1">
+            <button
+              type="submit"
+              disabled={loading}
+              className="app-btn-primary disabled:opacity-50"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                  </svg>
+                  가입 중
+                </span>
+              ) : (
+                "시작하기"
+              )}
+            </button>
+          </div>
         </form>
 
-        <div className="mt-6 text-center text-sm text-ink-muted">
-          이미 계정이 있으신가요?{" "}
-          <Link href="/login" className="font-bold text-ink hover:underline">로그인</Link>
-        </div>
+        {/* 하단 링크 */}
+        <div className="mt-8 space-y-4">
+          <p className="text-center text-sm text-[#6B6869]">
+            이미 계정이 있어요?{" "}
+            <Link href="/login" className="font-bold text-[#1A1A1A] hover:underline">
+              로그인
+            </Link>
+          </p>
 
-        <div className="mt-4 pt-4 border-t border-ink/20 text-center text-xs text-ink-muted space-y-1">
-          <p>글을 쓰고 싶으신가요? <Link href="/register/writer" className="font-bold text-ink hover:underline">작가로 지원하기 →</Link></p>
-          <p>기업 광고 문의? <Link href="/register/sponsor" className="font-bold text-ink hover:underline">스폰서 등록하기 →</Link></p>
+          <div className="app-divider" />
+
+          <div className="flex justify-center gap-4 text-xs text-[#AEAAA5]">
+            <Link href="/register/writer" className="hover:text-[#6B6869] transition-colors">
+              작가로 지원하기 →
+            </Link>
+            <span>·</span>
+            <Link href="/register/sponsor" className="hover:text-[#6B6869] transition-colors">
+              스폰서 등록
+            </Link>
+          </div>
         </div>
       </div>
     </div>

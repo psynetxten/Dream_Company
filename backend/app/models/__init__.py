@@ -8,6 +8,7 @@ from app.models.agent_log import AgentLog
 from app.models.notification import Notification
 from app.models.refresh_token import RefreshToken
 from app.models.template import TemplateSeries, TemplateSlot, TemplateEpisode, TemplatePurchase
+from app.models.credit_transaction import CreditTransaction
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "TemplateSlot",
     "TemplateEpisode",
     "TemplatePurchase",
+    "CreditTransaction",
 ]

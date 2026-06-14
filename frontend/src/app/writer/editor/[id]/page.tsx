@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ordersApi, writerApi, Order, Newspaper } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 
 export default function WriterEditor() {
     const { id } = useParams();
     const router = useRouter();
+    const { success, error: toastError } = useToast();
     const [order, setOrder] = useState<Order | null>(null);
     const [newspapers, setNewspapers] = useState<Newspaper[]>([]);
     const [selectedPaper, setSelectedPaper] = useState<Newspaper | null>(null);
@@ -44,9 +46,9 @@ export default function WriterEditor() {
                 lead_paragraph: selectedPaper.lead_paragraph,
                 body_content: selectedPaper.body_content,
             });
-            alert("임시 저장되었습니다.");
+            success("임시 저장되었습니다.");
         } catch (err) {
-            alert("저장에 실패했습니다.");
+            toastError("저장에 실패했습니다.");
         } finally {
             setSaving(false);
         }

@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    credits: int = 0
     subscription_plan: Optional[str]
     subscription_expires_at: Optional[datetime]
     created_at: datetime

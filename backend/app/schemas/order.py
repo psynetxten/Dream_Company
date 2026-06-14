@@ -19,7 +19,7 @@ class OrderCreate(BaseModel):
     duration_days: int = Field(..., ge=7)  # 7 | 14 | 30
     series_theme: Optional[str] = Field(None, max_length=200)
     future_year: int = Field(2030, ge=2025, le=2100)
-    payment_type: str = Field(..., pattern="^(subscription|one_time|free)$")
+    payment_type: str = Field(..., pattern="^(subscription|one_time|free|credits)$")
 
 
 class OrderResponse(BaseModel):

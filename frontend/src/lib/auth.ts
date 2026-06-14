@@ -33,7 +33,7 @@ export async function getUserRole(): Promise<string> {
 export function roleToHome(role: string): string {
   if (role === "writer") return "/writer/dashboard";
   if (role === "sponsor") return "/sponsor/dashboard";
-  return "/dashboard";
+  return "/";
 }
 
 /**
@@ -45,7 +45,8 @@ export async function registerAndLogin(
   password: string,
   full_name: string,
   role: "user" | "writer" | "sponsor",
-  apiUrl: string
+  apiUrl: string,
+  redirectTo?: string
 ): Promise<void> {
   // 1. 회원가입
   const regRes = await fetch(`${apiUrl}/api/v1/auth/register`, {
@@ -72,7 +73,7 @@ export async function registerAndLogin(
   });
   if (sessionError) throw sessionError;
 
-  // 4. 쿠키 설정 후 역할 홈으로 이동
+  // 4. 쿠키 설정 후 리다이렉트
   setRoleCookie(role);
-  window.location.href = roleToHome(role);
+  window.location.href = redirectTo || roleToHome(role);
 }

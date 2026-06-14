@@ -3,12 +3,23 @@ import { supabase } from "./supabase";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") {
-    if (window.location.hostname !== "localhost") {
-      return `https://${window.location.hostname}`;
+    const hostname = window.location.hostname;
+    // 프로덕션/배포 도메인은 빌드 시 env 사용
+    const isProd =
+      hostname.includes("dreamnewspaper.com") ||
+      hostname.includes("vercel.app") ||
+      hostname.includes("railway.app");
+    if (!isProd && hostname !== "localhost") {
+      // 로컬 WiFi IP로 모바일 접속 시 → 같은 호스트의 3003 포트 자동 사용
+      // (IP가 바뀌어도 재빌드 불필요)
+      return `http://${hostname}:3003`;
     }
   }
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003";
 };
+
+// login/page.tsx 등에서 직접 fetch할 때 동일한 URL 로직 재사용
+export const getApiBaseUrl = getBaseUrl;
 
 const API_URL = getBaseUrl();
 
@@ -39,7 +50,10 @@ api.interceptors.response.use(
     }
     if (error.response?.status === 401) {
       await supabase.auth.signOut();
-      window.location.href = "/login";
+      // 이미 /login이면 리다이렉트하지 않음 (무한루프 방지)
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
@@ -81,7 +95,54 @@ export const paymentApi = {
     api.get<{ order_id: string; payment_status: string; status: string; duration_days: number }>(
       `/payment/session/${session_id}`
     ),
+  /** 스폰서 슬롯 Stripe Checkout 세션 생성 */
+  createSponsorCheckout: (params: {
+    native_qty: number;
+    native_text: string;
+    sidebar_qty: number;
+    sidebar_text: string;
+  }) =>
+    api.post<{ checkout_url: string; session_id: string }>(
+      "/payment/sponsor/checkout",
+      null,
+      { params }
+    ),
 };
+
+// 크레딧
+export const creditsApi = {
+  /** 크레딧 팩 목록 조회 */
+  listPackages: () =>
+    api.get<CreditPackage[]>("/payment/credits/packages"),
+  /** 크레딧 팩 구매 Stripe Checkout 세션 생성 */
+  createCheckout: (package_id: string) =>
+    api.post<{ checkout_url: string; session_id: string }>(
+      "/payment/credits/checkout",
+      null,
+      { params: { package_id } }
+    ),
+  /** 크레딧 잔액 + 거래 내역 조회 */
+  getBalance: () =>
+    api.get<{ credits: number; transactions: CreditTransaction[] }>("/payment/credits/balance"),
+};
+
+export interface CreditPackage {
+  id: string;
+  credits: number;
+  price_krw: number;
+  label: string;
+  per_credit: number;
+}
+
+export interface CreditTransaction {
+  id: string;
+  type: "purchase" | "consume" | "bonus" | "refund";
+  amount: number;
+  credits_before: number;
+  credits_after: number;
+  description: string;
+  created_at: string;
+}
 
 // 작가
 export const writerApi = {
@@ -164,7 +225,7 @@ export interface OrderCreate {
   target_company?: string;
   duration_days: 7 | 14 | 30;
   future_year?: number;
-  payment_type: "subscription" | "one_time" | "free";
+  payment_type: "subscription" | "one_time" | "free" | "credits";
 }
 
 export interface Order {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { templateApi } from "@/lib/api";
 import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 interface MyTemplate {
   id: string;
@@ -24,6 +25,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 
 export default function WriterTemplatesPage() {
   const router = useRouter();
+  const { success, error: toastError } = useToast();
   const [templates, setTemplates] = useState<MyTemplate[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,9 +42,9 @@ export default function WriterTemplatesPage() {
     try {
       await templateApi.publish(id);
       setTemplates(prev => prev.map(t => t.id === id ? { ...t, status: "listed" } : t));
-      alert("마켓에 등록됐습니다!");
+      success("마켓에 등록됐습니다!");
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "등록에 실패했습니다.");
+      toastError(err?.response?.data?.detail || "등록에 실패했습니다.");
     }
   };
 

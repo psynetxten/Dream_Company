@@ -1,7 +1,10 @@
 """
 Stripe 결제 API
-- POST /payment/checkout-session  : Stripe Checkout 세션 생성 → checkout_url 반환
-- POST /payment/webhook           : Stripe 이벤트 수신 → 결제 완료 처리
+- POST /payment/checkout-session        : (레거시) 의뢰별 Stripe Checkout
+- POST /payment/credits/checkout        : 크레딧 팩 구매 Stripe Checkout
+- GET  /payment/credits/packages        : 크레딧 팩 목록
+- POST /payment/webhook                 : Stripe 웹훅 (결제 완료 처리)
+- GET  /payment/session/{session_id}    : 세션 상태 조회
 """
 import uuid
 import asyncio
@@ -12,6 +15,8 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models.order import Order
 from app.models.user import User
+from app.models.credit_transaction import CreditTransaction
+from app.models.sponsor import Sponsor, SponsorSlot
 from app.api.v1.auth import get_current_user
 from app.config import settings
 import structlog
@@ -19,31 +24,39 @@ import structlog
 logger = structlog.get_logger()
 router = APIRouter(prefix="/payment", tags=["payment"])
 
-# 기간별 가격 (KRW — Stripe는 최소 단위가 원화)
+# 기간별 가격 (레거시 — 의뢰별 결제)
 PLAN_PRICES: dict[int, int] = {
     7:  9_900,
     14: 19_900,
     30: 39_900,
 }
 
+# 크레딧 팩 정의
+CREDIT_PACKAGES: dict[str, dict] = {
+    "starter": {"credits": 10,  "price_krw": 4_900,  "label": "스타터",  "per_credit": 490},
+    "popular": {"credits": 30,  "price_krw": 12_900, "label": "인기",    "per_credit": 430},
+    "power":   {"credits": 100, "price_krw": 39_900, "label": "파워",    "per_credit": 399},
+}
+
+
+# ─────────────────────────────────────────────
+# 내부 헬퍼
+# ─────────────────────────────────────────────
 
 def _sync_create_stripe_session(
-    order_id: str,
-    duration_days: int,
+    metadata: dict,
+    line_item_name: str,
+    line_item_desc: str,
     amount: int,
     success_url: str,
     cancel_url: str,
 ) -> tuple[str, str]:
-    """Stripe Checkout 세션 생성 (sync → run_in_executor에서 호출)"""
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=[{
             "price_data": {
                 "currency": "krw",
-                "product_data": {
-                    "name": f"꿈신문사 {duration_days}일 시리즈",
-                    "description": "AI 기자단이 매일 오전 8시 꿈 신문을 발행합니다.",
-                },
+                "product_data": {"name": line_item_name, "description": line_item_desc},
                 "unit_amount": amount,
             },
             "quantity": 1,
@@ -51,52 +64,112 @@ def _sync_create_stripe_session(
         mode="payment",
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={"order_id": order_id},
+        metadata=metadata,
         locale="ko",
     )
     return session.url, session.id
 
 
-@router.post("/checkout-session")
-async def create_checkout_session(
-    order_id: uuid.UUID,
+async def _credit_checkout(metadata: dict, name: str, desc: str, amount: int,
+                           success_url: str, cancel_url: str) -> tuple[str, str]:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: _sync_create_stripe_session(metadata, name, desc, amount, success_url, cancel_url),
+    )
+
+
+# ─────────────────────────────────────────────
+# 크레딧 팩 API
+# ─────────────────────────────────────────────
+
+@router.get("/credits/packages")
+async def list_credit_packages():
+    """크레딧 팩 목록 반환"""
+    return [
+        {"id": k, **v}
+        for k, v in CREDIT_PACKAGES.items()
+    ]
+
+
+@router.post("/credits/checkout")
+async def create_credit_checkout(
+    package_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Stripe Checkout 세션 생성 — 프론트엔드에서 checkout_url로 리다이렉트"""
+    """크레딧 팩 Stripe Checkout 세션 생성"""
     if not settings.STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="결제 서비스가 설정되지 않았습니다.")
 
+    pkg = CREDIT_PACKAGES.get(package_id)
+    if not pkg:
+        raise HTTPException(status_code=400, detail="존재하지 않는 크레딧 팩입니다.")
+
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    result = await db.execute(select(Order).where(Order.id == order_id))
-    order = result.scalar_one_or_none()
+    success_url = f"{settings.FRONTEND_URL}/payment/credits/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url  = f"{settings.FRONTEND_URL}/credits"
 
-    if not order:
-        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
-    if order.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="권한이 없습니다.")
-    if order.payment_status == "paid":
-        raise HTTPException(status_code=400, detail="이미 결제 완료된 주문입니다.")
+    metadata = {
+        "type": "credit_pack",
+        "package_id": package_id,
+        "user_id": str(current_user.id),
+        "credits": str(pkg["credits"]),
+    }
 
-    amount = PLAN_PRICES.get(order.duration_days, 9_900)
-    success_url = f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{settings.FRONTEND_URL}/payment/cancel?order_id={order_id}"
-
-    loop = asyncio.get_event_loop()
-    checkout_url, session_id = await loop.run_in_executor(
-        None,
-        lambda: _sync_create_stripe_session(
-            str(order_id), order.duration_days, amount, success_url, cancel_url
-        ),
+    checkout_url, session_id = await _credit_checkout(
+        metadata=metadata,
+        name=f"꿈신문사 크레딧 {pkg['credits']}개 ({pkg['label']})",
+        desc=f"신문 {pkg['credits']}편을 읽을 수 있는 크레딧입니다. (편당 {pkg['per_credit']}원)",
+        amount=pkg["price_krw"],
+        success_url=success_url,
+        cancel_url=cancel_url,
     )
 
-    order.stripe_session_id = session_id
-    await db.commit()
-
-    logger.info("stripe_checkout_created", order_id=str(order_id), session_id=session_id)
+    logger.info("credit_checkout_created", user_id=str(current_user.id), package=package_id, session_id=session_id)
     return {"checkout_url": checkout_url, "session_id": session_id}
 
+
+@router.get("/credits/balance")
+async def get_credit_balance(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 크레딧 잔액 조회"""
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one_or_none()
+    credits = user.credits if user else 0
+
+    # 최근 거래 내역 10건
+    tx_result = await db.execute(
+        select(CreditTransaction)
+        .where(CreditTransaction.user_id == current_user.id)
+        .order_by(CreditTransaction.created_at.desc())
+        .limit(10)
+    )
+    transactions = tx_result.scalars().all()
+
+    return {
+        "credits": credits,
+        "transactions": [
+            {
+                "id": str(tx.id),
+                "type": tx.type,
+                "amount": tx.amount,
+                "credits_before": tx.credits_before,
+                "credits_after": tx.credits_after,
+                "description": tx.description,
+                "created_at": tx.created_at.isoformat(),
+            }
+            for tx in transactions
+        ],
+    }
+
+
+# ─────────────────────────────────────────────
+# Stripe 웹훅
+# ─────────────────────────────────────────────
 
 @router.post("/webhook")
 async def stripe_webhook(
@@ -104,18 +177,15 @@ async def stripe_webhook(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    """Stripe 웹훅 — 결제 완료 이벤트 처리 (서명 검증 포함)"""
+    """Stripe 웹훅 — 결제 완료 이벤트 처리"""
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    # 서명 검증 (STRIPE_WEBHOOK_SECRET 없으면 개발 모드로 통과)
     if settings.STRIPE_WEBHOOK_SECRET:
         try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-            )
+            event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
         except stripe.errors.SignatureVerificationError:
             logger.warning("stripe_webhook_invalid_signature")
             raise HTTPException(status_code=400, detail="Invalid signature")
@@ -128,27 +198,243 @@ async def stripe_webhook(
 
     if event_type == "checkout.session.completed":
         session_obj = event["data"]["object"]
-        order_id_str = session_obj.get("metadata", {}).get("order_id")
+        metadata = session_obj.get("metadata", {})
         payment_intent = session_obj.get("payment_intent", "")
 
-        if not order_id_str:
-            return {"status": "ignored"}
-
-        try:
-            order_uuid = uuid.UUID(order_id_str)
-        except ValueError:
-            return {"status": "ignored"}
-
-        result = await db.execute(select(Order).where(Order.id == order_uuid))
-        order = result.scalar_one_or_none()
-
-        if order and order.payment_status != "paid":
-            order.payment_status = "paid"
-            order.stripe_payment_intent_id = payment_intent
-            await db.commit()
-            logger.info("stripe_payment_confirmed", order_id=order_id_str)
+        if metadata.get("type") == "credit_pack":
+            await _handle_credit_purchase(db, session_obj, metadata, payment_intent)
+        elif metadata.get("type") == "sponsor_slot":
+            await _handle_sponsor_slot_purchase(db, metadata, payment_intent)
+        else:
+            await _handle_order_payment(db, metadata, payment_intent)
 
     return {"status": "ok"}
+
+
+async def _handle_credit_purchase(db: AsyncSession, session_obj: dict, metadata: dict, payment_intent: str):
+    """크레딧 팩 구매 완료 처리"""
+    user_id_str = metadata.get("user_id")
+    credits_str = metadata.get("credits", "0")
+    session_id = session_obj.get("id", "")
+
+    if not user_id_str:
+        return
+
+    try:
+        user_uuid = uuid.UUID(user_id_str)
+        credits_to_add = int(credits_str)
+    except (ValueError, TypeError):
+        return
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
+    user = result.scalar_one_or_none()
+    if not user:
+        return
+
+    credits_before = user.credits
+    user.credits += credits_to_add
+    credits_after = user.credits
+
+    tx = CreditTransaction(
+        user_id=user.id,
+        type="purchase",
+        amount=credits_to_add,
+        credits_before=credits_before,
+        credits_after=credits_after,
+        description=f"크레딧 {credits_to_add}개 구매",
+        stripe_session_id=session_id,
+    )
+    db.add(tx)
+    await db.commit()
+
+    logger.info("credit_purchase_confirmed", user_id=user_id_str, credits_added=credits_to_add, total=credits_after)
+
+
+async def _handle_order_payment(db: AsyncSession, metadata: dict, payment_intent: str):
+    """의뢰별 결제 완료 처리 (레거시)"""
+    order_id_str = metadata.get("order_id")
+    if not order_id_str:
+        return
+
+    try:
+        order_uuid = uuid.UUID(order_id_str)
+    except ValueError:
+        return
+
+    result = await db.execute(select(Order).where(Order.id == order_uuid))
+    order = result.scalar_one_or_none()
+    if order and order.payment_status != "paid":
+        order.payment_status = "paid"
+        order.stripe_payment_intent_id = payment_intent
+        await db.commit()
+        logger.info("stripe_payment_confirmed", order_id=order_id_str)
+
+
+# ─────────────────────────────────────────────
+# 스폰서 슬롯 Stripe Checkout
+# ─────────────────────────────────────────────
+
+PRICE_NATIVE  = 100  # 원/노출 — 네이티브 본문 삽입
+PRICE_SIDEBAR = 30   # 원/노출 — 사이드바 광고 박스
+
+
+@router.post("/sponsor/checkout")
+async def create_sponsor_slot_checkout(
+    native_qty: int = 0,
+    native_text: str = "",
+    sidebar_qty: int = 0,
+    sidebar_text: str = "",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """스폰서 광고 슬롯 구매 Stripe Checkout 세션 생성"""
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="결제 서비스가 설정되지 않았습니다.")
+
+    if native_qty < 0 or sidebar_qty < 0:
+        raise HTTPException(status_code=400, detail="수량은 0 이상이어야 합니다.")
+    if native_qty == 0 and sidebar_qty == 0:
+        raise HTTPException(status_code=400, detail="구매 수량을 입력하세요.")
+    if native_qty > 0 and not native_text.strip():
+        raise HTTPException(status_code=400, detail="네이티브 삽입 텍스트를 입력하세요.")
+
+    total_amount = native_qty * PRICE_NATIVE + sidebar_qty * PRICE_SIDEBAR
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    success_url = f"{settings.FRONTEND_URL}/payment/sponsor/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url  = f"{settings.FRONTEND_URL}/sponsor/slots"
+
+    metadata = {
+        "type":        "sponsor_slot",
+        "user_id":     str(current_user.id),
+        "native_qty":  str(native_qty),
+        "native_text": native_text[:490],
+        "sidebar_qty": str(sidebar_qty),
+        "sidebar_text": sidebar_text[:490],
+    }
+
+    desc_parts = []
+    if native_qty > 0:
+        desc_parts.append(f"네이티브 {native_qty}회({native_qty * PRICE_NATIVE:,}원)")
+    if sidebar_qty > 0:
+        desc_parts.append(f"사이드바 {sidebar_qty}회({sidebar_qty * PRICE_SIDEBAR:,}원)")
+
+    loop = asyncio.get_event_loop()
+    checkout_url, session_id = await loop.run_in_executor(
+        None,
+        lambda: _sync_create_stripe_session(
+            metadata=metadata,
+            line_item_name="꿈신문사 광고 슬롯",
+            line_item_desc=" + ".join(desc_parts),
+            amount=total_amount,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        ),
+    )
+
+    logger.info("sponsor_checkout_created", user_id=str(current_user.id), total=total_amount, session_id=session_id)
+    return {"checkout_url": checkout_url, "session_id": session_id}
+
+
+async def _handle_sponsor_slot_purchase(db: AsyncSession, metadata: dict, payment_intent: str):
+    """스폰서 슬롯 구매 완료 처리 — 웹훅에서 호출"""
+    user_id_str = metadata.get("user_id")
+    native_qty  = int(metadata.get("native_qty",  "0") or "0")
+    native_text = metadata.get("native_text", "")
+    sidebar_qty = int(metadata.get("sidebar_qty", "0") or "0")
+    sidebar_text = metadata.get("sidebar_text", "")
+
+    if not user_id_str:
+        return
+    try:
+        user_uuid = uuid.UUID(user_id_str)
+    except ValueError:
+        return
+
+    sponsor_result = await db.execute(select(Sponsor).where(Sponsor.user_id == user_uuid))
+    sponsor = sponsor_result.scalar_one_or_none()
+    if not sponsor:
+        logger.warning("sponsor_slot_webhook_no_sponsor", user_id=user_id_str)
+        return
+
+    if native_qty > 0 and native_text:
+        db.add(SponsorSlot(
+            sponsor_id=sponsor.id,
+            slot_type="company_name",
+            variable_value=native_text,
+            purchased_quantity=native_qty,
+            remaining_quantity=native_qty,
+            price_per_unit=PRICE_NATIVE,
+            total_amount=native_qty * PRICE_NATIVE,
+            payment_status="paid",
+            is_auto_matched=True,
+        ))
+
+    if sidebar_qty > 0:
+        db.add(SponsorSlot(
+            sponsor_id=sponsor.id,
+            slot_type="sidebar",
+            variable_value=sidebar_text or "",
+            purchased_quantity=sidebar_qty,
+            remaining_quantity=sidebar_qty,
+            price_per_unit=PRICE_SIDEBAR,
+            total_amount=sidebar_qty * PRICE_SIDEBAR,
+            payment_status="paid",
+            is_auto_matched=True,
+        ))
+
+    await db.commit()
+    logger.info("sponsor_slot_purchase_confirmed", sponsor_id=str(sponsor.id),
+                native=native_qty, sidebar=sidebar_qty)
+
+
+# ─────────────────────────────────────────────
+# 레거시: 의뢰별 Stripe Checkout
+# ─────────────────────────────────────────────
+
+@router.post("/checkout-session")
+async def create_checkout_session(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """(레거시) 의뢰별 Stripe Checkout"""
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="결제 서비스가 설정되지 않았습니다.")
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
+    if order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    if order.payment_status == "paid":
+        raise HTTPException(status_code=400, detail="이미 결제 완료된 주문입니다.")
+
+    amount = PLAN_PRICES.get(order.duration_days, 9_900)
+    success_url = f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url  = f"{settings.FRONTEND_URL}/payment/cancel?order_id={order_id}"
+
+    loop = asyncio.get_event_loop()
+    checkout_url, session_id = await loop.run_in_executor(
+        None,
+        lambda: _sync_create_stripe_session(
+            metadata={"order_id": str(order_id)},
+            line_item_name=f"꿈신문사 {order.duration_days}일 시리즈",
+            line_item_desc="기자단이 매일 오전 8시 꿈 신문을 발행합니다.",
+            amount=amount,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        ),
+    )
+
+    order.stripe_session_id = session_id
+    await db.commit()
+
+    logger.info("stripe_checkout_created", order_id=str(order_id), session_id=session_id)
+    return {"checkout_url": checkout_url, "session_id": session_id}
 
 
 @router.get("/session/{session_id}")
@@ -157,10 +443,8 @@ async def get_session_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Stripe session_id로 연결된 order_id 조회 (결제 성공 페이지에서 사용)"""
-    result = await db.execute(
-        select(Order).where(Order.stripe_session_id == session_id)
-    )
+    """Stripe session_id로 연결된 order 상태 조회"""
+    result = await db.execute(select(Order).where(Order.stripe_session_id == session_id))
     order = result.scalar_one_or_none()
 
     if not order:

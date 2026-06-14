@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { PortalProvider } from "@/components/PortalProvider";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import { ToastProvider } from "@/components/Toast";
 
 export const viewport: Viewport = {
   themeColor: "#1a1a1a",
@@ -27,10 +30,17 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: "꿈신문사",
-    description: "당신의 이름이 헤드라인을 장식하는 날",
+    title: "꿈신문사 — 당신의 꿈이 헤드라인이 됩니다",
+    description: "매일 아침 8시, 당신의 미래에서 신문이 도착합니다. 꿈신문사에서 당신의 이야기를 시작해보세요.",
     type: "website",
     locale: "ko_KR",
+    images: [{ url: "/api/og", width: 1200, height: 630, alt: "꿈신문사" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "꿈신문사 — 당신의 꿈이 헤드라인이 됩니다",
+    description: "매일 아침 8시, 당신의 미래에서 신문이 도착합니다.",
+    images: ["/api/og"],
   },
 };
 
@@ -51,9 +61,22 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="bg-newsprint-50 text-ink min-h-screen">
-        <PortalProvider>
-          {children}
-        </PortalProvider>
+        {/* Kakao JavaScript SDK */}
+        <Script
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
+          integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+        <ToastProvider>
+          <PortalProvider>
+            {/* 모바일 하단 네비게이션 높이만큼 패딩 */}
+            <div className="pb-safe-nav md:pb-0">
+              {children}
+            </div>
+            <MobileBottomNav />
+          </PortalProvider>
+        </ToastProvider>
       </body>
     </html>
   );

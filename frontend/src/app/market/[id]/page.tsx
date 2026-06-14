@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { templateApi } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 
 const CATEGORY_LABELS: Record<string, string> = {
   identity: "나",
@@ -41,6 +42,7 @@ interface TemplateDetail {
 export default function MarketDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { success, error: toastError, toast } = useToast();
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [slotValues, setSlotValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -84,18 +86,18 @@ export default function MarketDetailPage() {
       .filter(s => s.is_required && !slotValues[s.slot_key])
       .map(s => s.slot_label);
     if (missing.length > 0) {
-      alert(`필수 항목을 입력해주세요: ${missing.join(", ")}`);
+      toastError(`필수 항목을 입력해주세요: ${missing.join(", ")}`);
       return;
     }
     setSubmitting(true);
     try {
       const res = await templateApi.purchase(id as string, slotValues);
       const { order_id, protagonist, newspaper_count } = res.data;
-      alert(`🎉 ${protagonist}님의 신문 ${newspaper_count}편이 완성됐습니다!`);
+      success(`🎉 ${protagonist}님의 신문 ${newspaper_count}편이 완성됐습니다!`);
       router.push(`/newspapers/${order_id}`);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || "구매에 실패했습니다.";
-      alert(msg);
+      toastError(msg);
     } finally {
       setSubmitting(false);
     }

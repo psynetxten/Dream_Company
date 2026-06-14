@@ -7,9 +7,10 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
     libffi-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# uv 설치 (빠른 Python 패키지 매니저)
+# uv 설치
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # 의존성 설치 (캐시 레이어)

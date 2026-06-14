@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, status
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from datetime import datetime, timezone
@@ -6,9 +6,10 @@ from app.database import get_db
 from app.models.order import Order
 from app.models.newspaper import Newspaper
 from app.models.schedule import PublicationSchedule
+from app.models.user import User
+from app.models.credit_transaction import CreditTransaction
 from app.schemas.order import OrderCreate, OrderResponse, OrderStartResponse
 from app.api.v1.auth import get_current_user
-from app.models.user import User
 from app.core.exceptions import raise_not_found, raise_forbidden
 import uuid
 
@@ -29,8 +30,22 @@ async def create_order(
 
     # 무료 플랜은 7일만 허용
     if data.payment_type == "free" and data.duration_days != 7:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="무료 플랜은 7일 시리즈만 이용 가능합니다.")
+
+    # 크레딧 플랜: 잔액 미리 확인
+    if data.payment_type == "credits":
+        result = await db.execute(select(User).where(User.id == current_user.id))
+        user = result.scalar_one_or_none()
+        if not user or user.credits < data.duration_days:
+            available = user.credits if user else 0
+            raise HTTPException(
+                status_code=402,
+                detail=f"크레딧이 부족합니다. 필요: {data.duration_days}개, 보유: {available}개"
+            )
+
+    payment_status = "free" if data.payment_type == "free" else (
+        "paid" if data.payment_type == "credits" else "pending"
+    )
 
     order = Order(
         user_id=current_user.id,
@@ -43,7 +58,7 @@ async def create_order(
         series_theme=data.series_theme,
         future_year=data.future_year,
         payment_type=data.payment_type,
-        payment_status="free" if data.payment_type == "free" else "pending",
+        payment_status=payment_status,
         writer_type="ai",
         status="draft",
     )
@@ -73,10 +88,32 @@ async def start_order(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=f"이미 {order.status} 상태인 의뢰입니다.")
 
-    # 결제 상태 확인 (무료 주문은 바로 시작)
-    if order.payment_type != "free" and order.payment_status != "paid":
-        from fastapi import HTTPException
+    # 결제 상태 확인 (무료/크레딧 주문은 바로 시작)
+    if order.payment_type not in ("free", "credits") and order.payment_status != "paid":
         raise HTTPException(status_code=402, detail="결제가 완료되지 않았습니다.")
+
+    # 크레딧 차감
+    if order.payment_type == "credits":
+        user_result = await db.execute(select(User).where(User.id == current_user.id))
+        user = user_result.scalar_one_or_none()
+        if not user or user.credits < order.duration_days:
+            available = user.credits if user else 0
+            raise HTTPException(
+                status_code=402,
+                detail=f"크레딧이 부족합니다. 필요: {order.duration_days}개, 보유: {available}개"
+            )
+        credits_before = user.credits
+        user.credits -= order.duration_days
+        tx = CreditTransaction(
+            user_id=user.id,
+            type="consume",
+            amount=-order.duration_days,
+            credits_before=credits_before,
+            credits_after=user.credits,
+            description=f"{order.protagonist_name}의 꿈 {order.duration_days}편",
+            order_id=order.id,
+        )
+        db.add(tx)
 
     # 상태 업데이트
     order.status = "active"
@@ -138,8 +175,8 @@ async def _process_order_background(order_id: str):
 
         await db.flush()
 
-        # 무료 플랜: 첫 번째 에피소드 즉시 생성
-        if order.payment_type == "free":
+        # 무료/크레딧 플랜: 첫 번째 에피소드 즉시 생성
+        if order.payment_type in ("free", "credits"):
             from app.tasks.daily_publish import process_single_schedule
             import asyncio as _asyncio
 
@@ -186,6 +223,23 @@ async def list_orders(
         responses.append(_order_to_response(order, total, published))
 
     return responses
+
+
+@router.get("/dream-stats")
+async def get_dream_stats(
+    role: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    """같은 꿈(target_role)을 가진 의뢰 수 반환 — 인증 불필요"""
+    if not role:
+        return {"count": 0}
+    result = await db.execute(
+        select(func.count(Order.id)).where(
+            Order.target_role.ilike(f"%{role}%")
+        )
+    )
+    count = result.scalar() or 0
+    return {"count": count}
 
 
 @router.get("/{order_id}", response_model=OrderResponse)

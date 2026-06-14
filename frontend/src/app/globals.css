@@ -25,7 +25,7 @@
 
   body {
     font-family: 'Noto Serif KR', Georgia, serif;
-    background-color: var(--newsprint-bg);
+    background-color: #F4F3EE;
     color: var(--ink-primary);
     transition: background-color 0.3s ease;
   }
@@ -78,7 +78,7 @@
   }
 
   .newspaper-title {
-    @apply font-headline text-5xl font-bold tracking-widest;
+    @apply font-headline text-3xl sm:text-5xl font-bold tracking-widest;
     letter-spacing: 0.15em;
   }
 
@@ -101,12 +101,18 @@
     font-style: italic;
   }
 
-  /* 기사 본문 */
+  /* 기사 본문 — 모바일: 단일 컬럼, 데스크탑: 2컬럼 */
   .news-body {
     @apply text-base leading-relaxed;
-    column-count: 2;
+    column-count: 1;
     column-gap: 2rem;
     column-rule: 1px solid var(--border-color);
+  }
+
+  @media (min-width: 768px) {
+    .news-body {
+      column-count: 2;
+    }
   }
 
   .news-body p {
@@ -168,5 +174,154 @@
   .newspaper-page {
     max-width: 100%;
     box-shadow: none;
+  }
+}
+
+/* ── 모바일 앱 UX 유틸리티 ── */
+@layer utilities {
+  /* iOS Safe Area — 하단 홈 인디케이터 영역 보호 */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* 터치 대상 최소 크기 */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 텍스트 확대 방지 (iOS) */
+  .no-zoom {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* 스크롤바 숨기기 (에피소드 칩 등) */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* iOS Safe Area 패딩 */
+  .pt-safe-top { padding-top: env(safe-area-inset-top, 0px); }
+  .pb-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+  /* 앱 카드 탭 효과 */
+  .app-card-tap {
+    @apply transition-transform active:scale-[0.98];
+  }
+
+  /*
+   * ── Safe Area + Fixed Header/Nav 여백 ──
+   *
+   * pt-safe-header : AppBar(56px) + 상단 Safe Area (노치/상태바)
+   * pb-safe-nav    : 하단 NavBar(60px) + 하단 Safe Area (홈 인디케이터)
+   * pb-safe-nav-lg : pb-24(96px) 기반 + 하단 Safe Area
+   *
+   * env(safe-area-inset-*) 미지원 환경에서는 0px fallback 사용
+   */
+  .pt-safe-header {
+    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+  }
+
+  .pb-safe-nav {
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pb-safe-nav-lg {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ============================
+   앱 애니메이션 키프레임
+   ============================ */
+
+@keyframes toastIn {
+  from { transform: translateY(20px) scale(0.95); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUpIn {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDownOut {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ============================
+   앱 컴포넌트 스타일
+   ============================ */
+
+@layer components {
+  /* 앱 바 */
+  .app-bar {
+    @apply fixed top-0 left-0 right-0 z-40 h-14 flex items-center px-4 bg-[#F4F3EE]/95 backdrop-blur-md border-b border-[#E0DFD8];
+  }
+
+  /* 앱 카드 */
+  .app-card {
+    @apply bg-white rounded-2xl border border-[#E0DFD8] overflow-hidden;
+  }
+
+  /* 앱 버튼 */
+  .app-btn-primary {
+    @apply w-full bg-[#1A1A1A] text-white font-bold text-base rounded-2xl py-4 flex items-center justify-center transition-opacity active:opacity-75;
+    min-height: 56px;
+  }
+
+  .app-btn-secondary {
+    @apply w-full bg-[#F2F1EB] text-[#1A1A1A] font-bold text-base rounded-2xl py-4 flex items-center justify-center transition-opacity active:opacity-75;
+    min-height: 56px;
+  }
+
+  /* 앱 입력 */
+  .app-input {
+    @apply w-full bg-[#F2F1EB] text-[#1A1A1A] rounded-2xl px-4 py-4 text-base focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] border border-transparent placeholder:text-[#AEAAA5];
+    min-height: 54px;
+  }
+
+  /* 섹션 헤더 */
+  .app-section-label {
+    @apply text-xs font-bold uppercase tracking-[0.15em] text-[#6B6869];
+  }
+
+  /* 구분선 */
+  .app-divider {
+    @apply w-full h-px bg-[#E0DFD8];
+  }
+
+  /* 스켈레톤 */
+  .skeleton {
+    @apply bg-[#E0DFD8] animate-pulse rounded-xl;
+  }
+
+  /* 상태 뱃지 */
+  .badge-active {
+    @apply bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full;
+  }
+
+  .badge-draft {
+    @apply bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full;
+  }
+
+  .badge-done {
+    @apply bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full;
   }
 }

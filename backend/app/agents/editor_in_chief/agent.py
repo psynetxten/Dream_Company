@@ -57,13 +57,9 @@ class EditorInChief(BaseAgent):
         order_id = str(order.get("id", uuid.uuid4()))
         logger.info("orchestrator_new_order", order_id=order_id)
 
-        # 1. 스폰서 매칭 (pgvector + Claude)
-        try:
-            sponsors = await self.ad_sales.find_sponsors(order)
-            logger.info("sponsors_matched", order_id=order_id, count=len(sponsors))
-        except Exception as e:
-            logger.error("sponsor_match_error", order_id=order_id, error=str(e))
-            sponsors = []
+        # 1. 스폰서 매칭은 process_single_schedule에서만 실행 (중복 호출 제거)
+        # — 스폰서는 실제 신문 생성 시점에 한 번만 매칭하면 됨
+        sponsors = []
 
         # 2. 발행 스케줄 생성
         schedule = self._create_publication_schedule(order)

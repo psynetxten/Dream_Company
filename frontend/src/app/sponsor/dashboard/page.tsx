@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type Tab = "slots" | "matches" | "analytics";
+type Tab = "slots" | "matches" | "analytics" | "placement";
 
 export default function SponsorDashboard() {
   const router = useRouter();
@@ -110,7 +110,7 @@ export default function SponsorDashboard() {
       {/* 탭 */}
       <div className="max-w-6xl mx-auto">
         <div className="flex border-b-2 border-ink mb-8">
-          {(["slots", "matches", "analytics"] as Tab[]).map((t) => (
+          {(["slots", "matches", "analytics", "placement"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -118,7 +118,7 @@ export default function SponsorDashboard() {
                 tab === t ? "border-ink" : "border-transparent text-ink-muted hover:text-ink"
               }`}
             >
-              {t === "slots" ? "광고 슬롯" : t === "matches" ? "매칭 리포트" : "분석"}
+              {t === "slots" ? "광고 슬롯" : t === "matches" ? "매칭 리포트" : t === "analytics" ? "분석" : "지면 안내"}
             </button>
           ))}
         </div>
@@ -251,6 +251,160 @@ export default function SponsorDashboard() {
                 className="inline-block mt-4 text-xs font-bold hover:underline">
                 타겟팅 수정 →
               </Link>
+            </div>
+          </div>
+        )}
+        {/* 지면 안내 탭 */}
+        {tab === "placement" && (
+          <div className="space-y-10">
+            {/* 설명 */}
+            <div className="border-l-4 border-ink pl-6">
+              <h3 className="font-headline text-2xl font-bold mb-2">스폰서 지면은 어디에 노출되나요?</h3>
+              <p className="text-sm text-ink-muted leading-relaxed">
+                꿈신문사 광고는 배너가 아닙니다. 독자의 꿈 이야기 안에 <strong>귀사 브랜드가 자연스럽게 등장</strong>합니다.
+                매일 아침 발행되는 신문 1편에 두 곳의 지면이 할당됩니다.
+              </p>
+            </div>
+
+            {/* 신문 레이아웃 미리보기 */}
+            <div className="border-2 border-ink bg-newsprint-50 p-4">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-3 text-center">
+                신문 1편 레이아웃 (실제 지면 구조)
+              </div>
+
+              {/* 마스트헤드 */}
+              <div className="border-b-4 border-double border-ink pb-2 mb-3 text-center">
+                <div className="font-headline text-2xl font-black tracking-tighter">꿈신문사</div>
+                <div className="text-[9px] text-ink-muted tracking-widest">DREAM NEWSPAPER — 당신의 꿈이 이루어진 날</div>
+              </div>
+
+              {/* 헤드라인 */}
+              <div className="border-b border-ink pb-2 mb-3">
+                <div className="font-headline text-base font-bold leading-tight text-ink">
+                  이준호, 2030년 AI 스타트업 CTO로 선정 — "팀이 전부다"
+                </div>
+                <div className="text-[10px] text-ink-muted mt-1 italic">
+                  실리콘밸리 출신 50인 선정, 역대 최연소 기록 경신
+                </div>
+              </div>
+
+              {/* 본문 + 사이드바 */}
+              <div className="grid grid-cols-3 gap-3">
+
+                {/* 본문 (2/3) — 네이티브 노출 영역 */}
+                <div className="col-span-2 relative">
+                  <div className="text-[11px] leading-relaxed text-ink space-y-2">
+                    <p>
+                      이준호 CTO는 지난 3년간 <span className="bg-yellow-200 font-bold px-0.5 rounded">{profile?.company_name || "드림테크"}</span>와의 협업을 통해
+                      AI 기반 채용 시스템을 구축했다. 그는 "좋은 팀이 좋은 제품을 만든다"며
+                      인재 확보에 남다른 철학을 드러냈다.
+                    </p>
+                    <p className="text-ink-muted">
+                      올해 초 시리즈 B 투자를 유치한 이 CTO는 다음 목표로 글로벌
+                      시장 진출을 선언했다. 현재 팀원 120명을 이끌며...
+                    </p>
+                  </div>
+
+                  {/* 라벨 A */}
+                  <div className="absolute -left-2 top-0 flex items-start gap-1">
+                    <div className="bg-yellow-400 text-[9px] font-black px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+                      ① 본문 네이티브
+                    </div>
+                  </div>
+                </div>
+
+                {/* 사이드바 (1/3) — 광고 박스 영역 */}
+                <div className="col-span-1 relative">
+                  <div className="border-4 border-double border-ink p-2 bg-newsprint-50 relative">
+                    <div className="absolute -top-[8px] left-1/2 -translate-x-1/2 bg-newsprint-50 px-1">
+                      <span className="text-[7px] font-bold uppercase tracking-widest text-ink-muted">광고</span>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-headline text-sm font-black uppercase tracking-tight">
+                        {profile?.company_name || "드림테크"}
+                      </div>
+                      <div className="text-[7px] text-ink-muted mt-0.5">{profile?.industry || "IT/AI"}</div>
+                      <div className="border-t border-b border-ink/30 py-1.5 my-1.5">
+                        <p className="font-serif text-[9px] italic leading-relaxed">
+                          "AI로 세상을 다시 정의합니다"
+                        </p>
+                      </div>
+                      <div className="border border-ink px-2 py-0.5 text-[8px] font-bold uppercase inline-block">
+                        인재 모집
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 라벨 B */}
+                  <div className="absolute -right-2 top-0">
+                    <div className="bg-orange-400 text-[9px] font-black px-1.5 py-0.5 rounded-sm whitespace-nowrap text-white">
+                      ② 사이드바 광고
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 두 지면 상세 설명 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="border-2 border-ink p-6 bg-newsprint-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="bg-yellow-400 text-[10px] font-black px-2 py-1 rounded">① 본문 네이티브</span>
+                </div>
+                <h4 className="font-headline text-lg font-bold mb-2">기사 본문 자연 삽입</h4>
+                <p className="text-sm text-ink-muted leading-relaxed mb-4">
+                  독자의 꿈 스토리 안에 귀사 이름이 협업사·재직 회사·파트너로 자연스럽게 등장합니다.
+                  광고임을 인식하지 못한 채 읽히는 네이티브 포맷입니다.
+                </p>
+                <ul className="text-xs space-y-1 text-ink-muted">
+                  <li>· 기사 본문 1~3회 노출</li>
+                  <li>· AI가 문맥에 맞게 자동 삽입</li>
+                  <li>· 독자 직군 타겟팅 자동 매칭</li>
+                </ul>
+              </div>
+
+              <div className="border-2 border-ink p-6 bg-newsprint-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="bg-orange-400 text-[10px] font-black px-2 py-1 rounded text-white">② 사이드바 광고</span>
+                </div>
+                <h4 className="font-headline text-lg font-bold mb-2">우측 사이드바 광고 박스</h4>
+                <p className="text-sm text-ink-muted leading-relaxed mb-4">
+                  신문 우측 사이드바에 기업명·카피·CTA가 포함된 클래식 신문 광고 형식으로 노출됩니다.
+                  "광고" 라벨이 표시되어 투명성을 유지합니다.
+                </p>
+                <ul className="text-xs space-y-1 text-ink-muted">
+                  <li>· 신문 1편당 1개 광고 박스</li>
+                  <li>· 슬롯 구매 시 카피 직접 설정 가능</li>
+                  <li>· 업종별 자동 카피 생성 지원</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* 매칭 기준 */}
+            <div className="border-2 border-ink p-6 bg-newsprint-100">
+              <h4 className="font-headline text-lg font-bold mb-4">어떤 독자에게 노출되나요?</h4>
+              <p className="text-sm text-ink-muted mb-4">
+                ChromaDB 벡터 검색으로 귀사의 <strong>타겟 직군·키워드</strong>와 독자의 꿈 프로필을 매칭합니다.
+                관련성 점수가 임계값 이상인 신문에만 자동 배정됩니다.
+              </p>
+              <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                {[
+                  { step: "1", label: "타겟 설정", desc: "직군·키워드 등록" },
+                  { step: "2", label: "자동 매칭", desc: "벡터 유사도 계산" },
+                  { step: "3", label: "지면 삽입", desc: "신문 발행 시 노출" },
+                ].map(({ step, label, desc }) => (
+                  <div key={step} className="border border-ink/30 p-3">
+                    <div className="font-headline text-2xl font-bold text-ink-muted mb-1">{step}</div>
+                    <div className="font-bold text-xs uppercase tracking-wide">{label}</div>
+                    <div className="text-[10px] text-ink-muted mt-1">{desc}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 text-center">
+                <Link href="/sponsor/register" className="text-xs font-bold hover:underline">
+                  타겟 직군·키워드 설정하기 →
+                </Link>
+              </div>
             </div>
           </div>
         )}

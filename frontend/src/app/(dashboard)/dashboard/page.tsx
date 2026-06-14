@@ -3,6 +3,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ordersApi, Order } from "@/lib/api";
+import AppBar from "@/components/AppBar";
+
+function SkeletonCard() {
+  return (
+    <div className="app-card p-5 space-y-3">
+      <div className="skeleton h-4 w-2/3" />
+      <div className="skeleton h-3 w-1/2" />
+      <div className="skeleton h-2 w-full mt-2" />
+      <div className="skeleton h-10 w-full rounded-xl mt-1" />
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "active") return <span className="badge-active">연재 중</span>;
+  if (status === "draft") return <span className="badge-draft">준비 중</span>;
+  if (status === "paused") return <span className="badge-draft">일시 중지</span>;
+  return <span className="badge-done">{status === "completed" ? "완료" : status === "cancelled" ? "취소됨" : status}</span>;
+}
 
 export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -16,137 +35,160 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const statusLabel: Record<string, string> = {
-    draft: "준비 중",
-    active: "연재 중",
-    paused: "일시 중지",
-    completed: "완료",
-    cancelled: "취소됨",
-  };
-
-  const statusColor: Record<string, string> = {
-    draft: "bg-newsprint-300",
-    active: "bg-green-600 text-white",
-    paused: "bg-yellow-500",
-    completed: "bg-ink text-newsprint-50",
-    cancelled: "bg-red-500 text-white",
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="font-headline text-2xl text-ink-muted">꿈신문 불러오는 중...</div>
-      </div>
-    );
-  }
+  const activeOrders = orders.filter((o) => ["active", "draft", "paused"].includes(o.status));
+  const doneOrders = orders.filter((o) => ["completed", "cancelled"].includes(o.status));
 
   return (
-    <div className="min-h-screen max-w-4xl mx-auto px-6 py-8">
-      {/* 상단 네비게이션 */}
-      <div className="flex justify-between items-center mb-8 border-b border-ink pb-4">
-        <Link href="/" className="font-headline text-2xl font-bold">꿈신문사</Link>
-        <button
-          onClick={async () => {
-            const { supabase } = await import("@/lib/supabase");
-            await supabase.auth.signOut();
-            window.location.href = "/";
-          }}
-          className="text-sm font-bold border border-ink px-4 py-2 hover:bg-newsprint-200"
-        >
-          로그아웃
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#F4F3EE]">
+      <AppBar title="내 꿈 시리즈" showBack backHref="/" />
 
-      {/* 헤더 */}
-      <div className="newspaper-masthead px-0 mb-8">
-        <div className="newspaper-date-line mb-2">
-          <span>나의 꿈신문</span>
-          <span className="font-headline font-bold text-2xl">꿈신문사</span>
-          <span>대시보드</span>
-        </div>
-        <h1 className="font-headline text-4xl font-bold">내 꿈 시리즈</h1>
-      </div>
-
-      {/* 새 의뢰 버튼 */}
-      <div className="mb-8">
-        <Link
-          href="/order/new"
-          className="inline-block bg-ink text-newsprint-50 px-6 py-3 font-bold uppercase tracking-widest hover:bg-ink-light transition-colors"
-        >
-          + 새 꿈 의뢰하기
-        </Link>
-      </div>
-
-      {/* 의뢰 목록 */}
-      {orders.length === 0 ? (
-        <div className="border-2 border-ink p-12 text-center bg-newsprint-100">
-          <div className="font-headline text-3xl font-bold mb-4">
-            아직 꿈 의뢰가 없습니다
-          </div>
-          <p className="text-ink-muted mb-6">
-            첫 번째 꿈을 의뢰하면 내일 아침부터 꿈신문이 시작됩니다.
-          </p>
+      <div className="pt-safe-header pb-safe-nav px-4 space-y-6 max-w-lg mx-auto">
+        {/* 새 의뢰 버튼 + 크레딧 링크 */}
+        <div className="pt-4 space-y-2">
+          <Link href="/order/new" className="app-btn-primary">
+            + 새 꿈 의뢰하기
+          </Link>
           <Link
-            href="/order/new"
-            className="bg-ink text-newsprint-50 px-8 py-3 font-bold hover:bg-ink-light transition-colors"
+            href="/credits"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "10px 0",
+              fontSize: 13,
+              color: "#6B6869",
+              textDecoration: "none",
+            }}
           >
-            꿈 의뢰하기
+            <span>💳</span> 크레딧 충전 · 내역 보기
           </Link>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="border-2 border-ink bg-newsprint-100 p-6"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h2 className="font-headline text-xl font-bold">
-                    {order.protagonist_name}의 꿈
-                  </h2>
-                  <p className="text-sm text-ink-muted mt-1">
-                    {order.target_role}
-                    {order.target_company && ` @ ${order.target_company}`}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs font-bold px-3 py-1 ${statusColor[order.status] || "bg-newsprint-300"}`}
-                >
-                  {statusLabel[order.status] || order.status}
-                </span>
-              </div>
 
-              <p className="text-sm text-ink-muted mb-4 line-clamp-2">
-                {order.dream_description}
-              </p>
+        {/* 진행 중 */}
+        <section>
+          <p className="app-section-label mb-3">진행 중</p>
 
-              <div className="flex justify-between items-center">
-                <div className="flex gap-4 text-sm">
-                  <span>
-                    <strong>{order.duration_days}</strong>일 시리즈
-                  </span>
-                  <span>
-                    발행:{" "}
-                    <strong>
-                      {order.published_newspapers}/{order.duration_days}
-                    </strong>
-                    편
-                  </span>
-                  <span>{order.future_year}년 배경</span>
-                </div>
-
-                <Link
-                  href={`/newspapers/${order.id}`}
-                  className="text-sm border border-ink px-4 py-1 font-medium hover:bg-newsprint-200 transition-colors"
-                >
-                  신문 보기 →
-                </Link>
-              </div>
+          {loading ? (
+            <div className="space-y-3">
+              <SkeletonCard />
+              <SkeletonCard />
             </div>
-          ))}
-        </div>
-      )}
+          ) : activeOrders.length === 0 ? (
+            <div className="app-card p-8 flex flex-col items-center text-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-[#F2F1EB] flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="#AEAAA5" strokeWidth="1.8"/>
+                  <line x1="7" y1="9" x2="17" y2="9" stroke="#AEAAA5" strokeWidth="1.8" strokeLinecap="round"/>
+                  <line x1="7" y1="13" x2="13" y2="13" stroke="#AEAAA5" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-headline font-bold text-[#1A1A1A]">아직 진행 중인 시리즈가 없어요</p>
+                <p className="text-sm text-[#6B6869] mt-1">첫 번째 꿈을 의뢰하면<br />내일 아침부터 신문이 시작됩니다</p>
+              </div>
+              <Link href="/order/new" className="app-btn-primary mt-2" style={{ maxWidth: 200 }}>
+                꿈 의뢰하기
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeOrders.map((order) => {
+                const progress = order.duration_days > 0
+                  ? Math.round((order.published_newspapers / order.duration_days) * 100)
+                  : 0;
+                const remaining = order.duration_days - order.published_newspapers;
+
+                return (
+                  <div key={order.id} className="app-card p-5">
+                    {/* 상단: 뱃지 + D-N */}
+                    <div className="flex items-center justify-between mb-3">
+                      <StatusBadge status={order.status} />
+                      {order.status === "active" && (
+                        <span className="text-[#CC2200] text-xs font-bold">
+                          D-{remaining}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 제목 */}
+                    <h2 className="font-headline font-bold text-[#1A1A1A] text-base leading-snug">
+                      {order.protagonist_name}의 꿈
+                    </h2>
+                    <p className="text-xs text-[#6B6869] mt-0.5 truncate">
+                      {order.target_role}
+                      {order.target_company && ` @ ${order.target_company}`}
+                    </p>
+
+                    {/* 설명 */}
+                    {order.dream_description && (
+                      <p className="text-xs text-[#AEAAA5] mt-2 line-clamp-2 leading-relaxed">
+                        {order.dream_description}
+                      </p>
+                    )}
+
+                    {/* 진행률 바 */}
+                    <div className="mt-4 mb-4">
+                      <div className="flex justify-between text-[10px] text-[#AEAAA5] mb-1.5">
+                        <span>{order.published_newspapers}편 발행 / {order.duration_days}일 시리즈</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="h-1.5 bg-[#F2F1EB] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${progress}%`,
+                            background: progress >= 100
+                              ? "#22C55E"
+                              : progress >= 50
+                              ? "#1A1A1A"
+                              : "#CC2200",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/newspapers/${order.id}`}
+                      className="app-btn-primary"
+                      style={{ fontSize: 14, minHeight: 48 }}
+                    >
+                      신문 보기
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* 완료된 시리즈 */}
+        {!loading && doneOrders.length > 0 && (
+          <section>
+            <p className="app-section-label mb-3">완료된 시리즈</p>
+            <div className="space-y-3">
+              {doneOrders.map((order) => (
+                <div key={order.id} className="app-card p-4 opacity-60">
+                  <div className="flex items-center justify-between mb-2">
+                    <StatusBadge status={order.status} />
+                    <span className="text-[10px] text-[#AEAAA5]">{order.duration_days}일 시리즈</span>
+                  </div>
+                  <h3 className="font-headline font-bold text-[#1A1A1A] text-sm">
+                    {order.protagonist_name}의 꿈
+                  </h3>
+                  <p className="text-xs text-[#6B6869] mt-0.5 truncate">{order.target_role}</p>
+                  <Link
+                    href={`/newspapers/${order.id}`}
+                    className="mt-3 text-xs font-bold text-[#6B6869] underline"
+                  >
+                    신문 다시 보기
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

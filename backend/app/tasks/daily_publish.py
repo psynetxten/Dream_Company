@@ -95,17 +95,21 @@ async def process_single_schedule(
                 logger.warning("sponsor_match_skipped", error=str(e))
 
             await progress_store.emit(
-                str(schedule.order_id), "sponsor_matching", "맞춤 스폰서를 찾았습니다"
+                str(schedule.order_id),
+                "sponsor_matching",
+                "맞춤 스폰서를 찾았습니다",
+                sponsor_company=sponsor_company,
             )
 
-            # 신문 생성
+            # 신문 생성 (품질 검수 루프 제거 — 직접 생성)
+            # 품질 검수는 v2에서 규칙 기반(LLM 없이)으로 재도입 예정
             scheduled_date = schedule.scheduled_at.astimezone(ZoneInfo(order.timezone))
 
             await progress_store.emit(
                 str(schedule.order_id), "writing", "기자단이 기사를 작성하고 있습니다"
             )
 
-            newspaper_content = await orchestrator.generate_with_editorial_loop(
+            newspaper_content = await orchestrator.generate_single_newspaper(
                 order=order_dict,
                 episode=schedule.episode_number,
                 scheduled_date=scheduled_date,
@@ -145,10 +149,6 @@ async def process_single_schedule(
                 published_at=datetime.now(timezone.utc),
                 scheduled_at=schedule.scheduled_at,
             )
-            await progress_store.emit(
-                str(schedule.order_id), "quality_check", "편집장이 기사를 검수하고 있습니다"
-            )
-
             db.add(newspaper)
             await db.flush()
 
@@ -162,7 +162,10 @@ async def process_single_schedule(
                 "done",
                 "신문이 완성됐습니다!",
                 newspaper_id=str(newspaper.id),
-                order_id=str(schedule.order_id),
+                headline=newspaper_content.get("headline", ""),
+                subhead=newspaper_content.get("subhead", ""),
+                future_date_label=newspaper_content.get("future_date_label", ""),
+                sponsor_company=sponsor_company,
             )
 
             logger.info(

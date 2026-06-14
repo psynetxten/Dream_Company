@@ -104,11 +104,11 @@ export default function NewspaperLayout({
   return (
     <article className="newspaper-page min-h-screen p-0 pb-12 bg-newsprint-50">
 
-      <div className="border-2 border-ink mx-4 mb-12 bg-newsprint-50">
+      <div className="border-2 border-ink mx-2 sm:mx-4 mb-12 bg-newsprint-50">
         {/* ============================
             마스트헤드 (신문 상단 헤더)
             ============================ */}
-        <header className="newspaper-masthead px-6">
+        <header className="newspaper-masthead px-3 sm:px-6">
           <div className="newspaper-date-line text-xs mb-2">
             <span>VOL. 1, NO. {newspaper.episode_number}</span>
             <span className="font-bold tracking-widest">꿈신문사</span>
@@ -130,24 +130,24 @@ export default function NewspaperLayout({
         {/* ============================
             메인 콘텐츠
             ============================ */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 md:p-8">
           {/* 헤드라인 */}
-          <div className="border-b-2 border-ink pb-4 mb-6">
-            <h2 className="news-headline">{newspaper.headline}</h2>
+          <div className="border-b-2 border-ink pb-3 mb-4 sm:pb-4 sm:mb-6">
+            <h2 className="news-headline text-xl sm:text-2xl md:text-3xl leading-tight">{newspaper.headline}</h2>
             {newspaper.subhead && (
-              <p className="news-subhead">{newspaper.subhead}</p>
+              <p className="news-subhead text-sm sm:text-base mt-2">{newspaper.subhead}</p>
             )}
           </div>
 
           {/* Phase 2: AI 이미지 생성 — 보류 (Pollinations.ai 연동 예정) */}
 
-          {/* 2컬럼 레이아웃 */}
-          <div className="grid grid-cols-3 gap-6">
-            {/* 메인 기사 (2/3) */}
-            <div className="col-span-2">
+          {/* 모바일: 세로 스택 / 데스크탑: 3컬럼 그리드 */}
+          <div className="flex flex-col lg:grid lg:grid-cols-3 lg:gap-6 gap-4">
+            {/* 메인 기사 */}
+            <div className="lg:col-span-2">
               {/* 리드 문단 */}
               {newspaper.lead_paragraph && (
-                <div className="news-lead mb-6">
+                <div className="news-lead mb-4 sm:mb-6 text-sm sm:text-base">
                   {newspaper.lead_paragraph}
                 </div>
               )}
@@ -157,16 +157,16 @@ export default function NewspaperLayout({
 
               {/* 본문 */}
               {newspaper.body_content && (
-                <div className="news-body">
+                <div className="news-body text-sm sm:text-base leading-relaxed">
                   {newspaper.body_content.split("\n\n").map((para, idx) => (
-                    <p key={idx}>{para}</p>
+                    <p key={idx} className="mb-3">{para}</p>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* 사이드바 (1/3) */}
-            <div className="col-span-1 space-y-4">
+            {/* 사이드바 */}
+            <div className="lg:col-span-1 space-y-4">
               {/* 오늘의 한마디 — 다크 배경, 밝은 글자 */}
               {quote && (
                 <div className="bg-ink text-newsprint-50 p-4 border-2 border-ink">
@@ -217,7 +217,7 @@ export default function NewspaperLayout({
 
         {/* 신문 하단 */}
         <footer className="newspaper-footer">
-          <span>꿈신문사 © {new Date().getFullYear()}</span>
+          <span suppressHydrationWarning>꿈신문사 © {new Date().getFullYear()}</span>
           <span>
             {newspaper.episode_number}편 ·{" "}
             {newspaper.future_date_label || newspaper.future_date}

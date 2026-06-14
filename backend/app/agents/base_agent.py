@@ -1,8 +1,6 @@
 import asyncio
-import os
-import re
-import subprocess
 from typing import Any, Callable
+import anthropic
 from app.config import settings
 import structlog
 
@@ -10,67 +8,45 @@ logger = structlog.get_logger()
 
 _RETRY_DELAYS = [10, 30, 60]  # 재시도 대기(초)
 
-# ANSI 이스케이프 코드 제거용 패턴
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+
+def _call_anthropic(prompt: str, system: str = "", model: str = "", max_tokens: int = 4096) -> str:
+    """Anthropic SDK 동기 호출"""
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    messages = [{"role": "user", "content": prompt}]
+
+    kwargs: dict[str, Any] = {
+        "model": model or settings.WRITER_MODEL,
+        "max_tokens": max_tokens,
+        "messages": messages,
+    }
+    if system:
+        kwargs["system"] = system
+
+    response = client.messages.create(**kwargs)
+    return response.content[0].text
 
 
-def _strip_ansi(text: str) -> str:
-    return _ANSI_RE.sub("", text).strip()
+async def _call_anthropic_async(
+    prompt: str, system: str = "", model: str = "", max_tokens: int = 4096
+) -> str:
+    """Anthropic SDK 비동기 호출"""
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    messages = [{"role": "user", "content": prompt}]
 
+    kwargs: dict[str, Any] = {
+        "model": model or settings.WRITER_MODEL,
+        "max_tokens": max_tokens,
+        "messages": messages,
+    }
+    if system:
+        kwargs["system"] = system
 
-def _call_claude_cli(prompt: str, system: str = "", model: str = "") -> str:
-    """Claude CLI subprocess — OAuth 구독 방식 (API 키 불필요)"""
-    model_name = model or settings.WRITER_MODEL
-
-    # system 프롬프트는 user 메시지 앞에 컨텍스트로 삽입
-    full_prompt = (
-        f"<system_context>\n{system}\n</system_context>\n\n{prompt}"
-        if system
-        else prompt
-    )
-
-    cmd = [
-        "claude",
-        "-p", full_prompt,
-        "--model", model_name,
-    ]
-
-    env = os.environ.copy()
-    env.pop("ANTHROPIC_API_KEY", None)   # API 키 제거 → OAuth 토큰 사용
-    env["CLAUDE_CONFIG_DIR"] = "/root/.claude"
-
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=120,
-    )
-
-    stderr = _strip_ansi(result.stderr or "")
-    stdout = _strip_ansi(result.stdout or "")
-
-    if result.returncode != 0:
-        raise Exception(
-            f"Claude CLI failed (exit {result.returncode}): {stderr or stdout}"
-        )
-
-    if not stdout:
-        raise Exception(f"Claude CLI returned empty output. stderr: {stderr}")
-
-    return stdout
-
-
-async def _call_claude_cli_async(prompt: str, system: str = "", model: str = "") -> str:
-    """비동기 Claude CLI 호출 — run_in_executor로 블로킹 subprocess 래핑"""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        None, _call_claude_cli, prompt, system, model
-    )
+    response = await client.messages.create(**kwargs)
+    return response.content[0].text
 
 
 class BaseAgent:
-    """모든 에이전트의 기반 클래스 — Claude CLI (OAuth 구독 방식)"""
+    """모든 에이전트의 기반 클래스 — Anthropic Python SDK"""
 
     def __init__(
         self,
@@ -92,10 +68,11 @@ class BaseAgent:
                 if delay:
                     import time
                     time.sleep(delay)
-                return _call_claude_cli(
+                return _call_anthropic(
                     prompt=user_message,
                     system=self.system_prompt,
                     model=self.model_name,
+                    max_tokens=self.max_tokens,
                 )
             except Exception as e:
                 last_error = e
@@ -112,10 +89,11 @@ class BaseAgent:
             try:
                 if delay:
                     await asyncio.sleep(delay)
-                return await _call_claude_cli_async(
+                return await _call_anthropic_async(
                     prompt=user_message,
                     system=self.system_prompt,
                     model=self.model_name,
+                    max_tokens=self.max_tokens,
                 )
             except Exception as e:
                 last_error = e

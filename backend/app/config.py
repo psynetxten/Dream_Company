@@ -82,9 +82,9 @@ class Settings(BaseSettings):
     # ============================
     # AI 모델 설정
     # ============================
-    ORCHESTRATOR_MODEL: str = "gemini-2.5-pro"
-    WRITER_MODEL: str = "gemini-2.0-flash"
-    SPONSOR_MODEL: str = "gemini-2.0-flash"
+    ORCHESTRATOR_MODEL: str = "claude-haiku-4-5-20251001"
+    WRITER_MODEL: str = "claude-haiku-4-5-20251001"
+    SPONSOR_MODEL: str = "claude-haiku-4-5-20251001"
     MAX_CONCURRENT_GENERATIONS: int = 5
 
     # ============================

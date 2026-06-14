@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { writerApi, Order } from "@/lib/api";
 import { signOut } from "@/lib/auth";
 import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 export default function WriterDashboard() {
     const router = useRouter();
+    const { success, error: toastError } = useToast();
     const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
     const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -45,25 +47,25 @@ export default function WriterDashboard() {
     const handleClaim = async (orderId: string) => {
         try {
             await writerApi.claimOrder(orderId);
-            alert("의뢰가 배정되었습니다!");
+            success("의뢰가 배정되었습니다!");
             fetchData();
         } catch (err) {
-            alert("의뢰 배정에 실패했습니다.");
+            toastError("의뢰 배정에 실패했습니다.");
         }
     };
 
     if (loading) return <div className="p-8 text-center font-serif italic text-ink-muted">작가의 집무실로 이동 중...</div>;
 
     return (
-        <div className="max-w-6xl mx-auto px-6 py-12">
-            <header className="border-b-4 border-ink pb-4 mb-12 flex justify-between items-end">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+            <header className="border-b-4 border-ink pb-3 sm:pb-4 mb-6 sm:mb-12 flex justify-between items-end">
                 <div>
-                    <h1 className="font-headline text-4xl font-bold uppercase tracking-widest">작가 집무실</h1>
-                    <p className="text-sm text-ink-muted mt-2 italic">전문 작가 전용 대시보드</p>
+                    <h1 className="font-headline text-2xl sm:text-4xl font-bold uppercase tracking-widest">작가 집무실</h1>
+                    <p className="text-xs sm:text-sm text-ink-muted mt-1 sm:mt-2 italic">전문 작가 전용 대시보드</p>
                 </div>
                 <button
                     onClick={handleLogout}
-                    className="text-sm border-2 border-ink px-4 py-2 font-bold uppercase tracking-widest hover:bg-ink hover:text-newsprint-50 transition-colors"
+                    className="hidden md:block text-sm border-2 border-ink px-4 py-2 font-bold uppercase tracking-widest hover:bg-ink hover:text-newsprint-50 transition-colors"
                 >
                     로그아웃
                 </button>

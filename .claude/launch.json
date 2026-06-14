@@ -5,7 +5,15 @@
       "name": "Full Stack (Docker Compose)",
       "runtimeExecutable": "docker",
       "runtimeArgs": ["compose", "up"],
-      "port": 3000
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "Full Stack (Docker Build)",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "--build"],
+      "port": 3000,
+      "autoPort": false
     },
     {
       "name": "dev-preview",

@@ -3,525 +3,601 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePortal } from "@/components/PortalProvider";
-import { newspapersApi, writerApi, sponsorApi, templateApi, Newspaper, Order } from "@/lib/api";
+import { writerApi, sponsorApi, ordersApi, Order, getApiBaseUrl } from "@/lib/api";
+import AppBar from "@/components/AppBar";
+import { getStreak, recordActivity, StreakData } from "@/hooks/useStreak";
+import TypingLanding from "@/components/TypingLanding";
 
 /* ─────────────────────────────────────────
-   공용 유틸
+   스플래시 로딩 화면
 ───────────────────────────────────────── */
-function Divider() {
-  return <hr className="border-t-2 border-ink my-2" />;
-}
-
-/* ─────────────────────────────────────────
-   유저: 신문 카드
-───────────────────────────────────────── */
-function NewspaperCard({ paper, featured = false }: { paper: Newspaper; featured?: boolean }) {
+function SplashScreen() {
   return (
-    <article className={`border-2 border-ink bg-newsprint-50 flex flex-col overflow-hidden transition-shadow hover:shadow-lg ${featured ? "row-span-2" : ""}`}>
-      <div className="bg-ink text-newsprint-50 px-4 py-1.5 flex justify-between text-[10px] font-bold uppercase tracking-widest flex-shrink-0">
-        <span>꿈신문사</span>
-        <span>{paper.future_date_label || paper.future_date}</span>
-        <span>제{paper.episode_number}호</span>
+    <div className="h-dvh bg-[#1A1A1A] flex flex-col items-center justify-center gap-6">
+      {/* 신문 이모지 bounce */}
+      <div style={{ animation: "splashBounce 1.2s ease-in-out infinite" }} className="text-6xl select-none">
+        🗞️
       </div>
-      <div className="p-5 flex-1">
-        <h3 className={`font-headline font-bold leading-tight mb-2 ${featured ? "text-2xl" : "text-base"}`}>
-          {paper.headline || "제목 없음"}
-        </h3>
-        {paper.subhead && (
-          <p className="text-xs italic text-ink-muted mb-3 border-l-2 border-ink pl-2 leading-snug">
-            {paper.subhead}
-          </p>
-        )}
-        {paper.lead_paragraph && (
-          <p className={`text-sm leading-relaxed text-ink-muted ${featured ? "line-clamp-6" : "line-clamp-3"}`}>
-            {paper.lead_paragraph}
-          </p>
-        )}
-      </div>
-      <div className="border-t border-newsprint-300 px-4 py-2 flex justify-between text-[10px] text-ink-muted flex-shrink-0">
-        <span>꿈신문사 기자단</span>
-        <span className="italic">조회 {paper.view_count}</span>
-      </div>
-    </article>
-  );
-}
 
-function SkeletonCard({ featured = false }: { featured?: boolean }) {
-  return (
-    <div className={`border-2 border-newsprint-300 bg-newsprint-100 flex flex-col animate-pulse ${featured ? "row-span-2" : ""}`}>
-      <div className="bg-newsprint-300 h-7 flex-shrink-0" />
-      <div className="p-5 flex-1 space-y-2">
-        <div className={`bg-newsprint-300 rounded ${featured ? "h-6 w-3/4" : "h-4 w-4/5"}`} />
-        <div className="h-3 bg-newsprint-200 rounded w-1/2" />
-        <div className="h-3 bg-newsprint-200 rounded w-full" />
+      {/* 브랜드 */}
+      <div className="text-center">
+        <p className="font-headline font-bold text-white text-xl tracking-widest">꿈신문사</p>
+        <p className="text-[#6B6869] text-xs mt-1 tracking-wider">DREAM NEWSPAPER</p>
       </div>
-      <div className="border-t border-newsprint-300 h-10 flex-shrink-0" />
+
+      {/* 점 세 개 로딩 */}
+      <div className="flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-[#CC2200]"
+            style={{ animation: `splashDot 1.2s ease-in-out ${i * 0.2}s infinite` }}
+          />
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes splashBounce {
+          0%, 100% { transform: translateY(0) rotate(-3deg); }
+          50% { transform: translateY(-12px) rotate(3deg); }
+        }
+        @keyframes splashDot {
+          0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+          40% { opacity: 1; transform: scale(1.2); }
+        }
+      `}</style>
     </div>
   );
 }
 
-const SAMPLE_PAPERS: Newspaper[] = [
-  { id: "s1", order_id: "", episode_number: 1, future_date: "2031-03-15", future_date_label: "2031년 3월 15일", headline: "김민준, 구글 DeepMind 수석 연구원으로 공식 합류", subhead: "\"10년의 준비가 오늘 결실을 맺었다\" — 전 세계 AI 커뮤니티 주목", lead_paragraph: "김민준 박사가 구글 DeepMind 수석 연구원으로 공식 합류했다. 런던 본사에서 열린 환영 세레모니에서 팀원들의 열렬한 박수를 받으며 입장한 그는 \"솔직히 오늘 아침까지도 꿈인 줄 알았다\"고 말했다.", sidebar_content: {}, variables_used: {}, status: "published", view_count: 241 },
-  { id: "s2", order_id: "", episode_number: 7, future_date: "2030-06-22", future_date_label: "2030년 6월 22일", headline: "이서연, 카네기홀 데뷔 무대서 기립박수 10분", subhead: "피아니스트로서의 꿈, 마침내 세계 무대에서 현실이 되다", lead_paragraph: "피아니스트 이서연이 뉴욕 카네기홀 데뷔 무대에서 청중의 기립박수를 10분 넘게 받았다. 공연 직후 \"무대에 서는 순간 이게 꿈인지 현실인지 구분이 안 됐다\"고 떨리는 목소리로 소감을 전했다.", sidebar_content: {}, variables_used: {}, status: "published", view_count: 89 },
-  { id: "s3", order_id: "", episode_number: 14, future_date: "2032-11-03", future_date_label: "2032년 11월 3일", headline: "박지호 대표, 창업 3년 만에 유니콘 달성", subhead: "헬스케어 AI 스타트업 기업가치 1조 돌파", lead_paragraph: "박지호 대표가 이끄는 헬스케어 AI 스타트업이 시리즈 C 투자 유치에 성공하며 기업가치 1조 원을 돌파했다. 기자회견장에서 그는 말을 잇지 못하고 한참을 고개를 숙였다.", sidebar_content: {}, variables_used: {}, status: "published", view_count: 178 },
+/* ─────────────────────────────────────────
+   스켈레톤 로딩
+───────────────────────────────────────── */
+function SkeletonCard() {
+  return (
+    <div className="app-card p-4 space-y-3">
+      <div className="skeleton h-4 w-3/4" />
+      <div className="skeleton h-3 w-1/2" />
+      <div className="skeleton h-3 w-full" />
+      <div className="skeleton h-3 w-4/5" />
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   게스트: 온보딩 (3단계 캐러셀)
+───────────────────────────────────────── */
+const ONBOARDING_SLIDES = [
+  {
+    tag: "Dream Newspaper",
+    title: "당신의 꿈이\n헤드라인이 됩니다",
+    sub: "AI 기자단이 당신의 미래 이야기를\n매일 아침 신문으로 만들어 드립니다",
+    card: (
+      <div className="w-full bg-white rounded-2xl p-5 shadow-2xl" style={{ transform: "rotate(-2deg)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[#CC2200] text-[10px] font-bold uppercase tracking-widest">제1호</span>
+          <span className="text-[#AEAAA5] text-[10px]">2030년 3월 29일</span>
+        </div>
+        <h2 className="font-headline text-base font-bold text-[#1A1A1A] leading-snug mb-2">
+          김지은, 구글 코리아 수석 엔지니어로<br />새 역사를 써내려가다
+        </h2>
+        <p className="text-xs text-[#6B6869] leading-relaxed line-clamp-3">
+          서울 강남구 구글 코리아 본사에서 김지은 수석 엔지니어가 이끄는 팀이 새로운 AI 프로젝트를 성공적으로 론칭하며 업계의 주목을 받고 있다.
+        </p>
+        <div className="mt-3 pt-3 border-t border-[#E0DFD8] flex justify-between text-[10px] text-[#AEAAA5]">
+          <span>꿈신문사 기자단</span>
+          <span>조회 3,241</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    tag: "매일 아침 8시",
+    title: "미래에서 오는\n오늘의 신문",
+    sub: "매일 아침 8시, 당신의 꿈이\n현재진행형으로 펼쳐집니다",
+    card: (
+      <div className="w-full bg-white rounded-2xl p-5 shadow-2xl" style={{ transform: "rotate(1.5deg)" }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-[#F4F3EE] flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round"/>
+              <path d="M13.73 21C13.5542 21.3031 12.6946 21.9965 12 21.9965C11.3054 21.9965 10.6982 21.5547 10.27 21" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <p className="font-bold text-[#1A1A1A] text-sm">꿈신문사</p>
+            <p className="text-xs text-[#AEAAA5]">오늘 오전 8:00</p>
+          </div>
+        </div>
+        <p className="text-sm text-[#1A1A1A] font-medium leading-relaxed">
+          📰 <strong>이지훈</strong>의 오늘 꿈신문이 도착했습니다.<br/>
+          <span className="text-[#6B6869] text-xs">2031년의 당신이 보내는 편지</span>
+        </p>
+      </div>
+    ),
+  },
+  {
+    tag: "함께 꿈꾸는",
+    title: "이미 12,847명이\n꿈을 읽고 있어요",
+    sub: "취업, 창업, 예술, 스포츠...\n모든 꿈이 신문이 됩니다",
+    card: (
+      <div className="w-full bg-white rounded-2xl p-4 shadow-2xl space-y-3">
+        {[
+          { name: "박서준", role: "카카오 PM", days: "7일째 연재 중" },
+          { name: "이수연", role: "올림픽 피아니스트", days: "14일째 연재 중" },
+          { name: "김민준", role: "시리즈A 대표", days: "30일 완료" },
+        ].map((p, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#F4F3EE] flex items-center justify-center text-xs font-bold text-[#6B6869]">
+              {p.name[0]}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-[#1A1A1A]">{p.name}</p>
+              <p className="text-[10px] text-[#6B6869]">{p.role}</p>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              p.days.includes("완료") ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"
+            }`}>{p.days}</span>
+          </div>
+        ))}
+      </div>
+    ),
+  },
 ];
 
-/* ═══════════════════════════════════════════
-   작가 포털 홈
-═══════════════════════════════════════════ */
+function GuestOnboarding() {
+  const [slide, setSlide] = useState(0);
+  const total = ONBOARDING_SLIDES.length;
+  const s = ONBOARDING_SLIDES[slide];
+
+  return (
+    <div className="min-h-screen bg-[#1A1A1A] flex flex-col">
+      {/* 상단 점 인디케이터 */}
+      <div className="flex justify-center gap-2 pt-12 pb-4">
+        {Array.from({ length: total }).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setSlide(i)}
+            className={`rounded-full transition-all duration-300 ${
+              i === slide ? "w-6 h-2 bg-white" : "w-2 h-2 bg-white/30"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* 콘텐츠 영역 */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-4 max-w-sm mx-auto w-full">
+        <div className="text-center mb-8">
+          <p className="text-[#AEAAA5] text-xs font-bold uppercase tracking-[0.2em] mb-3">{s.tag}</p>
+          <h1 className="font-headline text-3xl font-bold text-white leading-tight whitespace-pre-line">
+            {s.title}
+          </h1>
+          <p className="text-[#6B6869] text-sm mt-3 leading-relaxed whitespace-pre-line">{s.sub}</p>
+        </div>
+
+        {/* 카드 */}
+        <div className="w-full">{s.card}</div>
+      </div>
+
+      {/* 하단 */}
+      <div className="px-6 pb-10 max-w-sm mx-auto w-full space-y-3">
+        {slide < total - 1 ? (
+          <>
+            <button
+              onClick={() => setSlide(slide + 1)}
+              className="app-btn-primary bg-white text-[#1A1A1A]"
+            >
+              다음 →
+            </button>
+            <Link
+              href="/register"
+              className="w-full text-center text-sm text-[#6B6869] py-2 block"
+            >
+              건너뛰기
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link href="/register" className="app-btn-primary bg-white text-[#1A1A1A]">
+              내 꿈 신문 만들기 🗞
+            </Link>
+            <Link
+              href="/login"
+              className="w-full border border-[#AEAAA5]/40 text-[#AEAAA5] font-bold text-base rounded-2xl py-4 flex items-center justify-center transition-opacity active:opacity-75"
+              style={{ minHeight: 56 }}
+            >
+              이미 계정이 있어요
+            </Link>
+            <div className="flex justify-center gap-4 pt-1">
+              <Link href="/register/writer" className="text-xs text-[#6B6869]">작가 지원</Link>
+              <span className="text-[#6B6869]">·</span>
+              <Link href="/register/sponsor" className="text-xs text-[#6B6869]">스폰서 등록</Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   유저: 홈 피드
+───────────────────────────────────────── */
+/* ─────────────────────────────────────────
+   "서비스 어떻게 되나요?" 3단계 미리보기
+───────────────────────────────────────── */
+function HowItWorks() {
+  const steps = [
+    { step: "01", title: "꿈을 의뢰해요", desc: "되고 싶은 모습을 자유롭게 적어주세요", icon: "✍️" },
+    { step: "02", title: "기자단이 써요", desc: "AI 기자단이 당신의 꿈을 신문 기사로 만들어요", icon: "📰" },
+    { step: "03", title: "매일 아침 도착해요", desc: "오전 8시, 미래의 당신 이야기가 신문으로 와요", icon: "☀️" },
+  ];
+  return (
+    <div className="space-y-2">
+      {steps.map((s) => (
+        <div key={s.step} className="flex items-center gap-4 app-card p-4">
+          <div className="text-2xl w-10 text-center flex-shrink-0">{s.icon}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-bold text-[#AEAAA5] tracking-widest">{s.step}</span>
+              <p className="font-bold text-[#1A1A1A] text-sm">{s.title}</p>
+            </div>
+            <p className="text-xs text-[#6B6869]">{s.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function UserHome() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [streak, setStreak] = useState<StreakData>({ days: 0, lastActive: null, bestStreak: 0, isActiveToday: false });
+  const [stats, setStats] = useState<{ user_count: number; newspaper_count: number; sponsor_count: number } | null>(null);
+
+  useEffect(() => {
+    const s = recordActivity();
+    setStreak(s);
+    ordersApi.list().then((r) => setOrders(r.data)).catch(() => {}).finally(() => setLoading(false));
+    fetch(`${getApiBaseUrl()}/api/v1/stats`).then((r) => r.json()).then(setStats).catch(() => {});
+  }, []);
+
+  const activeOrders = orders.filter((o) => o.status === "active");
+
+  return (
+    <div className="min-h-screen bg-[#F4F3EE]">
+      <AppBar
+        right={
+          <button className="w-8 h-8 flex items-center justify-center text-[#1A1A1A]" aria-label="알림">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        }
+      />
+
+      <div className="pt-safe-header pb-safe-nav px-4 space-y-6 max-w-lg mx-auto">
+
+        {/* 커뮤니티 통계 */}
+        {stats && (
+          <div className="pt-4">
+            <div className="app-card px-4 py-4">
+              <p className="text-xs text-[#AEAAA5] font-medium mb-3 tracking-wide">지금 꿈신문사에서는</p>
+              <div className="grid grid-cols-3 gap-0 divide-x divide-[#E0DFD8]">
+                <div className="text-center px-2">
+                  <p className="font-bold text-[#1A1A1A] text-lg leading-tight">
+                    {stats.user_count >= 1000 ? `${(stats.user_count / 1000).toFixed(1)}천` : stats.user_count}
+                  </p>
+                  <p className="text-[10px] text-[#AEAAA5] mt-0.5 leading-tight">같은 꿈을<br/>꾸는 사람들</p>
+                </div>
+                <div className="text-center px-2">
+                  <p className="font-bold text-[#1A1A1A] text-lg leading-tight">
+                    {stats.newspaper_count >= 1000 ? `${(stats.newspaper_count / 1000).toFixed(1)}천` : stats.newspaper_count}
+                  </p>
+                  <p className="text-[10px] text-[#AEAAA5] mt-0.5 leading-tight">발행된<br/>미래 신문</p>
+                </div>
+                <div className="text-center px-2">
+                  <p className="font-bold text-[#1A1A1A] text-lg leading-tight">{stats.sponsor_count}</p>
+                  <p className="text-[10px] text-[#AEAAA5] mt-0.5 leading-tight">함께하는<br/>파트너 기업</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 스트릭 배너 */}
+        {streak.days > 0 && (
+          <div className="pt-4">
+            <div className="app-card px-4 py-3 flex items-center gap-3">
+              <span className="text-2xl">{streak.days >= 7 ? "🔥" : streak.days >= 3 ? "⚡" : "✨"}</span>
+              <div className="flex-1">
+                <p className="font-bold text-[#1A1A1A] text-sm">
+                  {streak.days}일 연속으로 읽고 있어요!
+                </p>
+                <p className="text-xs text-[#AEAAA5]">
+                  최고 기록 {streak.bestStreak}일
+                  {streak.days >= 7 && " · 대단해요 🎉"}
+                </p>
+              </div>
+              {/* 7일 진행 도트 */}
+              <div className="flex gap-1">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: i < streak.days % 7 || (streak.days >= 7 && i < 7) ? "#1A1A1A" : "#E0DFD8" }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 연재 중인 시리즈 */}
+        <section className={streak.days > 0 ? "" : "pt-4"}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="app-section-label">연재 중인 시리즈</p>
+            {/* 데스크탑에서만 표시 — 모바일은 하단 FAB 사용 */}
+            <Link
+              href="/order/new"
+              className="hidden md:flex items-center gap-1 text-xs font-bold text-[#CC2200] border border-[#CC2200] px-3 py-1.5 rounded-full hover:bg-[#CC2200] hover:text-white transition-colors"
+            >
+              + 새 의뢰
+            </Link>
+          </div>
+
+          {loading ? (
+            <SkeletonCard />
+          ) : activeOrders.length === 0 ? (
+            <div className="space-y-4">
+              {/* CTA 카드 */}
+              <div className="app-card p-6 flex flex-col items-center text-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-[#1A1A1A] flex items-center justify-center text-3xl">
+                  🗞️
+                </div>
+                <div>
+                  <p className="font-headline font-bold text-[#1A1A1A] text-lg leading-snug">
+                    첫 번째 꿈신문을<br/>시작해볼까요?
+                  </p>
+                  <p className="text-sm text-[#6B6869] mt-2 leading-relaxed">
+                    꿈을 입력하면 내일 아침 8시에<br/>미래의 내 이야기가 신문으로 도착해요
+                  </p>
+                </div>
+                <Link href="/order/new" className="app-btn-primary" style={{ maxWidth: 240 }}>
+                  무료로 시작하기 →
+                </Link>
+              </div>
+              {/* 작동 방식 */}
+              <div>
+                <p className="app-section-label mb-3">이렇게 진행돼요</p>
+                <HowItWorks />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeOrders.map((order) => {
+                const progress = Math.round((order.published_newspapers / order.duration_days) * 100);
+                return (
+                  <div key={order.id} className="app-card p-5">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="badge-active">연재 중</span>
+                          <span className="text-xs text-[#AEAAA5]">{order.duration_days}일 시리즈</span>
+                        </div>
+                        <h3 className="font-headline font-bold text-[#1A1A1A] text-base leading-snug truncate">
+                          {order.protagonist_name}의 꿈
+                        </h3>
+                        <p className="text-xs text-[#6B6869] mt-0.5 truncate">{order.target_role}</p>
+                      </div>
+                      <span className="text-[#CC2200] text-xs font-bold flex-shrink-0 ml-2">
+                        D-{order.duration_days - order.published_newspapers}
+                      </span>
+                    </div>
+                    {/* 진행률 바 */}
+                    <div className="mb-3">
+                      <div className="flex justify-between text-[10px] text-[#AEAAA5] mb-1.5">
+                        <span>{order.published_newspapers}편 발행</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="h-1.5 bg-[#F2F1EB] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[#1A1A1A] transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                    <Link
+                      href={`/newspapers/${order.id}`}
+                      className="app-btn-primary"
+                      style={{ minHeight: 44, fontSize: 14 }}
+                    >
+                      신문 보기
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* 연재 완료 시리즈 — 신문이 있는 유저에게만 안내 */}
+        {!loading && activeOrders.length > 0 && (
+          <section>
+            <p className="app-section-label mb-3">이렇게 진행돼요</p>
+            <div className="app-card p-4 flex items-center gap-3 text-sm text-[#6B6869]">
+              <span className="text-xl">☀️</span>
+              <p>매일 오전 8시, 새 편이 자동 발행됩니다</p>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   작가: 집무실
+───────────────────────────────────────── */
 function WriterHome() {
   const [assigned, setAssigned] = useState<Order[]>([]);
   const [available, setAvailable] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([writerApi.getAssignedOrders(), writerApi.getAvailableOrders()])
-      .then(([a, b]) => { setAssigned(a.data || []); setAvailable(b.data || []); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      writerApi.getAssignedOrders().then((r) => setAssigned(r.data)).catch(() => {}),
+      writerApi.getAvailableOrders().then((r) => setAvailable(r.data)).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
-  const stats = [
-    { label: "진행 중인 의뢰", value: loading ? "…" : String(assigned.length), href: "/writer/dashboard", cta: "집필 열기", highlight: assigned.length > 0 },
-    { label: "새 의뢰 대기", value: loading ? "…" : String(available.length), href: "/writer/dashboard", cta: "수락하기", highlight: available.length > 0 },
-    { label: "내 발행 작품", value: "보기", href: "/writer/dashboard", cta: "전체 보기", highlight: false },
-    { label: "스폰서 요청", value: "확인", href: "/writer/dashboard", cta: "확인하기", highlight: false },
-  ];
-
   return (
-    <div className="min-h-screen bg-newsprint-50 font-serif">
-      {/* 마스트헤드 */}
-      <header className="bg-ink text-newsprint-50 px-8 py-10 border-b-4 border-newsprint-300">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-[10px] uppercase tracking-[0.4em] text-newsprint-400 mb-2">꿈신문사 · 작가 전용</p>
-          <h1 className="font-headline text-5xl font-black tracking-tight mb-2">작가 집무실</h1>
-          <p className="text-newsprint-300 text-sm italic">당신의 펜으로 누군가의 꿈이 현실이 됩니다</p>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#F4F3EE]">
+      <AppBar title="집무실" />
 
-      <main className="max-w-5xl mx-auto px-6 py-10 space-y-10">
-
-        {/* ── 4칸 액션 허브 ── */}
-        <section>
-          <h2 className="font-headline text-lg font-bold uppercase tracking-widest border-b-2 border-ink pb-2 mb-6">지금 할 수 있는 것</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map((s) => (
-              <Link key={s.label} href={s.href}
-                className={`border-2 p-5 flex flex-col justify-between min-h-[140px] transition-all hover:shadow-lg hover:-translate-y-0.5 ${s.highlight ? "border-ink bg-ink text-newsprint-50" : "border-ink bg-newsprint-100 text-ink"}`}>
-                <div>
-                  <div className={`text-3xl font-headline font-black mb-1 ${s.highlight ? "text-newsprint-50" : "text-ink"}`}>{s.value}</div>
-                  <div className={`text-[11px] uppercase tracking-widest ${s.highlight ? "text-newsprint-300" : "text-ink-muted"}`}>{s.label}</div>
-                </div>
-                <div className={`text-[10px] font-bold uppercase mt-4 ${s.highlight ? "text-newsprint-300" : "text-ink-muted"}`}>{s.cta} →</div>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {/* ── 진행 중 의뢰 (즉시 집필) ── */}
-        <section>
-          <h2 className="font-headline text-lg font-bold uppercase tracking-widest border-b-2 border-ink pb-2 mb-6">
-            바로 집필하기
-            {assigned.length > 0 && <span className="ml-2 text-sm text-ink-muted normal-case font-normal italic">— {assigned.length}건 진행 중</span>}
-          </h2>
+      <div className="pt-safe-header pb-safe-nav px-4 space-y-6 max-w-lg mx-auto">
+        {/* 내 의뢰 */}
+        <section className="pt-4">
+          <p className="app-section-label mb-3">배정된 의뢰</p>
           {loading ? (
-            <div className="text-ink-muted italic text-sm">불러오는 중...</div>
+            <SkeletonCard />
           ) : assigned.length === 0 ? (
-            <div className="border-2 border-dashed border-newsprint-300 p-10 text-center text-ink-muted italic">
-              <p className="mb-4">배정된 의뢰가 없습니다.</p>
-              <Link href="/writer/dashboard" className="text-sm font-bold text-ink hover:underline">새 의뢰 둘러보기 →</Link>
+            <div className="app-card p-6 text-center text-sm text-[#AEAAA5]">
+              배정된 의뢰가 없어요
             </div>
           ) : (
             <div className="space-y-3">
               {assigned.map((order) => (
-                <div key={order.id} className="border-2 border-ink bg-newsprint-50 p-5 flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-headline font-bold text-lg truncate">{order.protagonist_name}의 꿈</div>
-                    <div className="text-xs text-ink-muted mt-0.5 italic truncate">{order.target_role}{order.target_company ? ` · ${order.target_company}` : ""}</div>
-                    <p className="text-sm text-ink-muted mt-2 line-clamp-1 font-serif">"{order.dream_description}"</p>
+                <div key={order.id} className="app-card p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="badge-active">진행 중</span>
                   </div>
-                  <Link href={`/writer/editor/${order.id}`}
-                    className="flex-shrink-0 bg-ink text-newsprint-50 px-6 py-3 font-bold uppercase tracking-widest text-sm hover:opacity-80 transition-opacity whitespace-nowrap">
-                    집필 시작 →
-                  </Link>
+                  <h3 className="font-headline font-bold text-[#1A1A1A] text-sm">{order.protagonist_name}의 꿈</h3>
+                  <p className="text-xs text-[#6B6869] mt-0.5">{order.target_role}</p>
+                  <p className="text-xs text-[#AEAAA5] mt-2">
+                    {order.published_newspapers}/{order.duration_days}편 발행
+                  </p>
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        {/* ── 새 의뢰 수락 ── */}
-        {available.length > 0 && (
-          <section>
-            <h2 className="font-headline text-lg font-bold uppercase tracking-widest border-b-2 border-ink pb-2 mb-6">
-              작가를 기다리는 꿈 <span className="ml-2 text-pro-accent">{available.length}건</span>
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {available.slice(0, 4).map((order) => (
-                <div key={order.id} className="border-2 border-dashed border-ink p-5 bg-newsprint-100">
-                  <div className="font-bold text-base mb-1">{order.protagonist_name}님</div>
-                  <div className="text-xs text-ink-muted mb-2 italic">{order.target_role}</div>
-                  <p className="text-sm text-ink-muted line-clamp-2 font-serif mb-4">"{order.dream_description}"</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold">예상 수익 KRW 40,000</span>
-                    <Link href="/writer/dashboard" className="text-xs font-bold border-2 border-ink px-3 py-1.5 hover:bg-newsprint-200 transition-colors uppercase">
-                      수락하기
-                    </Link>
-                  </div>
+        {/* 수락 대기 */}
+        <section>
+          <p className="app-section-label mb-3">수락 대기 의뢰</p>
+          {loading ? (
+            <SkeletonCard />
+          ) : available.length === 0 ? (
+            <div className="app-card p-6 text-center text-sm text-[#AEAAA5]">
+              대기 중인 의뢰가 없어요
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {available.map((order) => (
+                <div key={order.id} className="app-card p-4">
+                  <span className="badge-draft mb-2 inline-block">대기 중</span>
+                  <h3 className="font-headline font-bold text-[#1A1A1A] text-sm">{order.protagonist_name}의 꿈</h3>
+                  <p className="text-xs text-[#6B6869] mt-0.5">{order.target_role} · {order.duration_days}일</p>
                 </div>
               ))}
             </div>
-            {available.length > 4 && (
-              <div className="text-center mt-4">
-                <Link href="/writer/dashboard" className="text-sm font-bold hover:underline">+{available.length - 4}건 더 보기</Link>
-              </div>
-            )}
-          </section>
-        )}
-      </main>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════
-   스폰서 포털 홈
-═══════════════════════════════════════════ */
+/* ─────────────────────────────────────────
+   스폰서: 센터
+───────────────────────────────────────── */
 function SponsorHome() {
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  const [analytics, setAnalytics] = useState<{
+    total_slots?: number;
+    active_slots?: number;
+    total_exposures?: number;
+    newspapers_featured?: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    sponsorApi.getAnalytics()
-      .then((r) => { setAnalytics(r.data); setHasProfile(true); })
-      .catch((e) => { setHasProfile(e?.response?.status === 404 ? false : null); });
+    sponsorApi.getAnalytics().then((r) => setAnalytics(r.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const steps = [
-    { n: "01", title: "기업 등록", desc: "회사명, 산업군, 타겟 직업군을 입력합니다. 3분이면 충분합니다.", href: "/sponsor/register", cta: hasProfile ? "수정하기" : "지금 등록", done: hasProfile === true },
-    { n: "02", title: "광고 슬롯 구매", desc: "기사에 브랜드를 자연스럽게 삽입할 슬롯을 선택합니다. 현재 무료 베타.", href: "/sponsor/slots", cta: "슬롯 선택", done: analytics?.total_slots > 0 },
-    { n: "03", title: "매칭 결과 확인", desc: "AI가 꿈이 맞는 독자를 자동 선별해 브랜드를 노출합니다.", href: "/sponsor/dashboard", cta: "대시보드 보기", done: analytics?.total_exposures > 0 },
+  const stats = [
+    { label: "총 슬롯", value: analytics?.total_slots ?? 0 },
+    { label: "활성 슬롯", value: analytics?.active_slots ?? 0 },
+    { label: "총 노출", value: analytics?.total_exposures ?? 0 },
+    { label: "등장 신문", value: analytics?.newspapers_featured ?? 0 },
   ];
 
   return (
-    <div className="min-h-screen bg-newsprint-50 font-serif">
-      {/* 마스트헤드 */}
-      <header className="bg-newsprint-900 text-newsprint-50 px-8 py-10 border-b-4 border-newsprint-700">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-[10px] uppercase tracking-[0.4em] text-newsprint-500 mb-2">꿈신문사 · 스폰서 전용</p>
-          <h1 className="font-headline text-5xl font-black tracking-tight mb-2">Sponsor Center</h1>
-          <p className="text-newsprint-400 text-sm italic">꿈을 가진 독자에게, 자연스럽게</p>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#F4F3EE]">
+      <AppBar title="스폰서 센터" />
 
-      <main className="max-w-4xl mx-auto px-6 py-10 space-y-12">
+      <div className="pt-safe-header pb-safe-nav px-4 space-y-6 max-w-lg mx-auto">
+        {/* 현황 숫자 */}
+        <section className="pt-4">
+          <p className="app-section-label mb-3">현황</p>
+          <div className="grid grid-cols-2 gap-3">
+            {stats.map((stat) => (
+              <div key={stat.label} className="app-card p-4 text-center">
+                {loading ? (
+                  <div className="skeleton h-6 w-12 mx-auto mb-2" />
+                ) : (
+                  <p className="font-headline font-bold text-[#1A1A1A] text-2xl">{stat.value.toLocaleString()}</p>
+                )}
+                <p className="text-xs text-[#6B6869] mt-1">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        {/* ── 현황 요약 (프로필 있을 때) ── */}
-        {hasProfile && analytics && (
-          <section>
-            <h2 className="font-headline text-lg font-bold uppercase tracking-widest border-b-2 border-ink pb-2 mb-6">내 광고 현황</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "보유 슬롯", value: analytics.total_slots },
-                { label: "활성 슬롯", value: analytics.active_slots },
-                { label: "총 노출", value: analytics.total_exposures },
-                { label: "게재 신문", value: analytics.newspapers_featured },
-              ].map(({ label, value }) => (
-                <div key={label} className="border-2 border-ink bg-ink text-newsprint-50 p-5 text-center">
-                  <div className="font-headline text-3xl font-black">{value}</div>
-                  <div className="text-[11px] uppercase tracking-widest text-newsprint-400 mt-1">{label}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex gap-3">
-              <Link href="/sponsor/dashboard" className="border-2 border-ink px-6 py-2.5 font-bold text-sm uppercase tracking-widest hover:bg-newsprint-200 transition-colors">
-                전체 대시보드 →
-              </Link>
-              <Link href="/sponsor/slots" className="bg-ink text-newsprint-50 px-6 py-2.5 font-bold text-sm uppercase tracking-widest hover:opacity-80 transition-opacity">
-                슬롯 추가 구매
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {/* ── 3단계 온보딩 ── */}
+        {/* 온보딩 단계 */}
         <section>
-          <h2 className="font-headline text-lg font-bold uppercase tracking-widest border-b-2 border-ink pb-2 mb-6">
-            {hasProfile ? "진행 단계" : "이렇게 시작하세요"}
-          </h2>
-          <div className="space-y-4">
-            {steps.map((s) => (
-              <div key={s.n} className={`border-2 p-6 flex items-center gap-6 transition-all ${s.done ? "border-ink bg-newsprint-100 opacity-60" : "border-ink bg-newsprint-50 hover:shadow-lg"}`}>
-                <div className={`font-headline text-4xl font-black flex-shrink-0 ${s.done ? "text-newsprint-400 line-through" : "text-ink"}`}>{s.n}</div>
-                <div className="flex-1">
-                  <div className="font-bold text-base mb-1 flex items-center gap-2">
-                    {s.title}
-                    {s.done && <span className="text-[10px] bg-ink text-newsprint-50 px-2 py-0.5 font-bold uppercase">완료</span>}
-                  </div>
-                  <p className="text-sm text-ink-muted">{s.desc}</p>
-                </div>
-                <Link href={s.href}
-                  className={`flex-shrink-0 px-6 py-3 font-bold uppercase tracking-widest text-sm whitespace-nowrap transition-colors ${s.done ? "border border-newsprint-300 text-ink-muted" : "bg-ink text-newsprint-50 hover:opacity-80"}`}>
-                  {s.cta} →
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── 왜 꿈신문사인가 ── */}
-        {!hasProfile && (
-          <section className="border-4 border-ink bg-ink text-newsprint-50 p-8">
-            <h2 className="font-headline text-2xl font-bold mb-6">꿈신문사 광고가 다른 이유</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                { title: "광고처럼 보이지 않습니다", desc: "브랜드가 독자의 꿈 기사 안에 자연스럽게 녹아듭니다. 독자는 스토리를 읽고, 브랜드는 기억됩니다." },
-                { title: "정확한 타겟에게 도달합니다", desc: "AI가 꿈의 내용을 분석해 브랜드와 맞는 독자에게만 노출합니다. 의료 브랜드는 의사 꿈을 가진 독자에게." },
-                { title: "잠재 지원자 풀이 됩니다", desc: "독자의 꿈 = 그 기업의 미래 지원자. 채용 브랜딩과 광고를 동시에 해결합니다." },
-              ].map((item) => (
-                <div key={item.title}>
-                  <div className="font-bold text-sm mb-2 text-newsprint-50">{item.title}</div>
-                  <p className="text-xs text-newsprint-400 leading-relaxed">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   유저 랜딩 (메인)
-═══════════════════════════════════════════ */
-interface TopTemplate {
-  id: string;
-  title: string;
-  genre: string;
-  duration_days: number;
-  price_krw: number;
-  preview_headline: string;
-  slot_count: number;
-  purchase_count: number;
-}
-
-export default function LandingPage() {
-  const { portalType } = usePortal();
-  const [papers, setPapers] = useState<Newspaper[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [topTemplates, setTopTemplates] = useState<TopTemplate[]>([]);
-
-  useEffect(() => {
-    newspapersApi.publicFeed(6)
-      .then((res) => setPapers(res.data?.length ? res.data : SAMPLE_PAPERS))
-      .catch(() => setPapers(SAMPLE_PAPERS))
-      .finally(() => setLoading(false));
-    templateApi.listMarket()
-      .then((res) => setTopTemplates((res.data || []).slice(0, 3)))
-      .catch(() => {});
-  }, []);
-
-  const displayPapers = papers.length > 0 ? papers : SAMPLE_PAPERS;
-  const isSample = papers.length === 0 && !loading;
-
-  // 로그인 사용자에게 보여줄 대시보드 링크
-  const dashboardHref =
-    portalType === "writer" ? "/writer/dashboard" :
-    portalType === "sponsor" ? "/sponsor/dashboard" :
-    portalType === "user" ? "/dashboard" : null;
-
-  return (
-    <div className="min-h-screen bg-newsprint-50 font-serif">
-
-      {/* 로그인 사용자 배너 */}
-      {dashboardHref && (
-        <div className="bg-ink text-newsprint-50 py-2 text-center text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-4">
-          <span>
-            {portalType === "writer" ? "✒ 작가 집무실" : portalType === "sponsor" ? "◆ 스폰서 센터" : "✦ 내 꿈 신문"}
-          </span>
-          <Link href={dashboardHref} className="border border-newsprint-400 px-3 py-0.5 text-[10px] hover:bg-newsprint-800 transition-colors">
-            대시보드 바로가기 →
-          </Link>
-        </div>
-      )}
-
-      {/* 속보 띠 */}
-      {!dashboardHref && (
-        <div className="bg-ink text-newsprint-50 py-1.5 text-center text-[11px] font-bold uppercase tracking-widest">
-          매일 오전 8시 발행 &nbsp;·&nbsp; 꿈신문사 기자단 &nbsp;·&nbsp; 당신의 꿈이 헤드라인이 됩니다
-        </div>
-      )}
-
-      {/* 히어로 */}
-      <header className="border-b-4 border-ink text-center px-6 pt-10 pb-8">
-        <p className="text-[11px] tracking-[0.4em] uppercase text-ink-muted mb-3">Dream Newspaper &nbsp;·&nbsp; Est. 2026</p>
-        <h1 className="font-headline text-5xl sm:text-7xl md:text-[88px] leading-none font-black tracking-[0.08em] mb-4">꿈신문사</h1>
-        <p className="text-base sm:text-lg text-ink-muted italic max-w-lg mx-auto mb-2">당신의 이름이 헤드라인을 장식하는 날</p>
-        <p className="text-sm text-ink-muted max-w-md mx-auto mb-8 px-2">
-          꿈이 이루어진 날, 어떤 기사가 나올까요.<br />
-          꿈신문사 기자단이 그 날을 오늘의 언어로 씁니다.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center px-4">
-          <Link href="/register" className="bg-ink text-newsprint-50 px-10 py-4 sm:py-3 font-bold text-sm uppercase tracking-widest hover:opacity-80 transition-opacity text-center min-h-[48px] flex items-center justify-center">
-            내 신문 만들기
-          </Link>
-          <Link href="/preview" className="border-2 border-ink text-ink px-10 py-4 sm:py-3 font-bold text-sm uppercase tracking-widest hover:bg-newsprint-200 transition-colors text-center min-h-[48px] flex items-center justify-center">
-            신문 구경하기
-          </Link>
-        </div>
-
-        {/* 작가 / 스폰서 진입점 */}
-        <div className="flex gap-5 justify-center mt-5 text-xs text-ink-muted">
-          <Link href="/register/writer" className="hover:text-ink transition-colors flex items-center gap-1">
-            <span className="font-bold">✒ 작가로 지원하기</span>
-          </Link>
-          <span className="text-newsprint-300">·</span>
-          <Link href="/register/sponsor" className="hover:text-ink transition-colors flex items-center gap-1">
-            <span className="font-bold">◆ 스폰서 등록하기</span>
-          </Link>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6">
-
-        {/* ── 꿈 백화점: 발행 중인 신문 ── */}
-        <section className="py-12">
-          <div className="flex items-baseline justify-between border-b-2 border-ink pb-2 mb-6">
-            <h2 className="font-headline text-xl font-bold uppercase tracking-wide">
-              {isSample ? "이런 신문이 매일 발행됩니다" : "지금 발행 중인 꿈신문"}
-            </h2>
-            <Link href="/preview" className="text-[11px] font-bold hover:underline tracking-widest uppercase">
-              샘플 전체 보기 →
-            </Link>
-          </div>
-
-          {/* 그리드: 모바일 1열 → 태블릿 2열 → 데스크탑 3열 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {loading ? (
-              <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
-            ) : (
-              displayPapers.slice(0, 6).map((p) => <NewspaperCard key={p.id} paper={p} />)
-            )}
-          </div>
-
-          {/* 편집국 노트 */}
-          <div className="mt-8 border-t-2 border-b-2 border-ink py-5 flex items-center gap-6">
-            <div className="font-headline text-4xl font-black text-newsprint-300 flex-shrink-0 leading-none">✦</div>
-            <div>
-              <p className="text-sm text-ink-muted italic leading-relaxed">
-                위 신문들은 모두 실제로 발행된 꿈신문입니다. 주인공의 이름, 직업, 꿈을 입력하면 기자단이 같은 방식으로 당신의 이야기를 씁니다.
-              </p>
-              <p className="text-[11px] text-ink-muted mt-2 not-italic">— 꿈신문사 편집국</p>
-            </div>
-          </div>
-        </section>
-
-        <Divider />
-
-        {/* ── 마켓 TOP 3 ── */}
-        {topTemplates.length > 0 && (
-          <section className="py-12">
-            <div className="flex items-baseline justify-between border-b-2 border-ink pb-2 mb-6">
-              <div>
-                <h2 className="font-headline text-xl font-bold uppercase tracking-wide">THE DREAM MARKET</h2>
-                <p className="text-xs text-ink-muted italic mt-1">작가가 써둔 시리즈 — 내 이름을 넣으면 나만의 신문이 됩니다</p>
-              </div>
-              <Link href="/market" className="text-[11px] font-bold hover:underline tracking-widest uppercase">
-                전체 보기 →
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {topTemplates.map((t) => (
-                <article key={t.id} className="border-2 border-ink bg-newsprint-50 hover:shadow-lg transition-shadow flex flex-col">
-                  <div className="bg-ink text-newsprint-50 px-4 py-1 flex justify-between items-center">
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{t.genre}</span>
-                    <span className="text-[10px] font-bold">{t.duration_days}일 시리즈</span>
-                  </div>
-                  <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="font-headline text-lg font-bold mb-2 leading-tight">{t.title}</h3>
-                    {t.preview_headline && (
-                      <div className="border-l-4 border-ink pl-3 mb-4 flex-1">
-                        <p className="font-serif italic text-xs leading-relaxed text-ink-muted line-clamp-3">
-                          &ldquo;{t.preview_headline}&rdquo;
-                        </p>
-                      </div>
-                    )}
-                    <div className="text-[10px] text-ink-muted mb-4">
-                      ✦ 슬롯 {t.slot_count}개 개인화 &nbsp;·&nbsp; {t.purchase_count}명 구매
-                    </div>
-                    <div className="flex justify-between items-center pt-3 border-t border-ink/20">
-                      <span className="font-headline text-xl font-black">
-                        {t.price_krw === 0 ? "무료" : `₩${t.price_krw.toLocaleString()}`}
-                      </span>
-                      <Link
-                        href={`/market/${t.id}`}
-                        className="bg-ink text-newsprint-50 px-4 py-1.5 font-bold text-xs uppercase tracking-widest hover:bg-ink/80 transition-colors"
-                      >
-                        내 이름으로 →
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="text-center mt-8">
-              <Link
-                href="/market"
-                className="inline-block border-2 border-ink px-10 py-3 font-bold text-sm uppercase tracking-widest hover:bg-newsprint-200 transition-colors"
-              >
-                마켓 전체 둘러보기 →
-              </Link>
-            </div>
-          </section>
-        )}
-
-        <Divider />
-
-        {/* ── 꿈신문사에 대하여 ── */}
-        <section className="py-14">
-          <h2 className="font-headline text-xl font-bold uppercase tracking-wide border-b-2 border-ink pb-2 mb-10">꿈신문사에 대하여</h2>
-          <div className="grid grid-cols-3 gap-8">
+          <p className="app-section-label mb-3">시작하기</p>
+          <div className="space-y-2">
             {[
-              { n: "01", title: "꿈을 말씀해 주세요", desc: "이름, 원하는 직업, 기억에 남는 장면 하나. 거창하지 않아도 됩니다. 아직 형태가 없어도 됩니다." },
-              { n: "02", title: "기자단이 그날을 씁니다", desc: "꿈신문사 기자단이 그 꿈이 이루어진 날을 현재진행형으로 기록합니다. 취재하듯, 목격하듯." },
-              { n: "03", title: "매일 오전 8시, 신문이 옵니다", desc: "연재가 시작됩니다. 7일 동안 당신이 그 꿈 안에 살게 됩니다." },
-            ].map((s) => (
-              <div key={s.n} className="flex gap-5">
-                <div className="font-headline text-5xl font-black text-newsprint-300 leading-none flex-shrink-0">{s.n}</div>
-                <div>
-                  <div className="font-bold text-sm uppercase tracking-wide mb-2">{s.title}</div>
-                  <p className="text-xs text-ink-muted leading-relaxed">{s.desc}</p>
+              { step: 1, label: "스폰서 등록", href: "/register/sponsor", desc: "기업 정보 등록" },
+              { step: 2, label: "슬롯 구매", href: "/sponsor/slots", desc: "기사 삽입 슬롯 선택" },
+              { step: 3, label: "결과 확인", href: "/sponsor/dashboard", desc: "노출 현황 분석" },
+            ].map((item) => (
+              <Link key={item.step} href={item.href} className="app-card p-4 flex items-center gap-4 active:bg-[#F2F1EB]">
+                <div className="w-8 h-8 rounded-full bg-[#1A1A1A] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                  {item.step}
                 </div>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-[#1A1A1A] text-sm">{item.label}</p>
+                  <p className="text-xs text-[#6B6869]">{item.desc}</p>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M6 4L10 8L6 12" stroke="#AEAAA5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Link>
             ))}
           </div>
         </section>
-
-        {/* ── 하단 CTA ── */}
-        <section className="py-12 mb-10 border-t-4 border-b-4 border-ink text-center px-8">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-ink-muted mb-6">꿈신문사 편집국</p>
-          <h2 className="font-headline text-4xl font-black mb-5 leading-tight text-ink">
-            당신의 꿈은<br />어떤 기사가 될까요
-          </h2>
-          <p className="text-ink-muted text-sm mb-8 max-w-sm mx-auto leading-relaxed">
-            아직 이루어지지 않았기에 더 선명하게 쓸 수 있습니다.<br />
-            꿈신문사는 그 날의 기억을 먼저 만들어 드립니다.
-          </p>
-          <Link href="/register" className="inline-block bg-ink text-newsprint-50 px-14 py-4 font-bold text-base uppercase tracking-widest hover:opacity-80 transition-opacity">
-            내 신문 만들기
-          </Link>
-        </section>
-      </main>
-
-      <footer className="border-t-4 border-ink">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center text-[11px] text-ink-muted font-medium">
-          <span>꿈신문사 © 2026</span>
-          <span className="font-headline font-black tracking-widest text-ink">DREAM NEWSPAPER</span>
-          <span>꿈신문사 기자단</span>
-        </div>
-      </footer>
+      </div>
     </div>
   );
+}
+
+/* ─────────────────────────────────────────
+   메인 라우터
+───────────────────────────────────────── */
+export default function HomePage() {
+  const { portalType, isLoading } = usePortal();
+
+  if (isLoading) {
+    return <SplashScreen />;
+  }
+
+  if (portalType === "writer") return <WriterHome />;
+  if (portalType === "sponsor") return <SponsorHome />;
+  if (portalType === "user") return <UserHome />;
+  if (portalType === "guest") return <TypingLanding />;
+  return <TypingLanding />;
 }

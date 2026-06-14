@@ -1,27 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ordersApi, OrderCreate, paymentApi } from "@/lib/api";
+import { ordersApi, creditsApi, OrderCreate } from "@/lib/api";
 
 const DURATION_OPTIONS = [
-  { days: 7,  label: "7일",  priceLabel: "무료",    desc: "체험 시리즈" },
-  { days: 14, label: "14일", priceLabel: "17,900원", desc: "집중 시리즈" },
-  { days: 30, label: "30일", priceLabel: "29,900원", desc: "완성 시리즈" },
+  { days: 7,  label: "7일",  credits: 7,  desc: "체험" },
+  { days: 14, label: "14일", credits: 14, desc: "집중" },
+  { days: 30, label: "30일", credits: 30, desc: "완성" },
 ] as const;
 
 const FUTURE_YEARS = [2027, 2028, 2029, 2030, 2032, 2035];
 
-/* ── 상단 진행 바 ── */
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex gap-1.5 px-6 pt-4 pb-2">
+    <div style={{ display: "flex", gap: 5, padding: "0 24px 0" }}>
       {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className="flex-1 h-1 rounded-full transition-all duration-300"
-          style={{ background: i < current ? "#1A1A1A" : "#E0DFD8" }}
-        />
+        <div key={i} style={{
+          flex: 1, height: 3, borderRadius: 99,
+          background: i < current ? "#1A1A1A" : "#E0DFD8",
+          transition: "background 0.3s",
+        }} />
       ))}
     </div>
   );
@@ -32,6 +32,7 @@ export default function OrderForm() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [form, setForm] = useState<OrderCreate>({
     dream_description: "",
     protagonist_name: "",
@@ -42,26 +43,34 @@ export default function OrderForm() {
     payment_type: "free",
   });
 
-  const isFree = form.payment_type === "free";
+  useEffect(() => {
+    creditsApi.getBalance().then((r) => setCreditBalance(r.data.credits)).catch(() => {});
+  }, []);
 
-  /* ─── 단계별 유효성 ─── */
+  const isFree = form.payment_type === "free";
+  const isCredits = form.payment_type === "credits";
+  const selectedOption = DURATION_OPTIONS.find((o) => o.days === form.duration_days)!;
+  const hasEnoughCredits = creditBalance !== null && creditBalance >= (isCredits ? selectedOption.credits : 0);
+
   const canNext1 = form.dream_description.trim().length >= 10;
   const canNext2 = form.protagonist_name.trim().length >= 1 && form.target_role.trim().length >= 1;
 
-  /* ─── 제출 ─── */
   const handleSubmit = async () => {
     setLoading(true);
     setError("");
     try {
       const createRes = await ordersApi.create(form);
       const orderId = createRes.data.id;
+      const name = encodeURIComponent(form.protagonist_name || "");
+      const role = encodeURIComponent(form.target_role || "");
 
-      if (isFree) {
+      if (isFree || isCredits) {
         await ordersApi.start(orderId);
-        router.push(`/order/generating?orderId=${orderId}`);
+        router.push(`/order/generating?orderId=${orderId}&name=${name}&role=${role}`);
         return;
       }
 
+      const { paymentApi } = await import("@/lib/api");
       const sessionRes = await paymentApi.createCheckoutSession(orderId);
       window.location.href = sessionRes.data.checkout_url;
     } catch (err: unknown) {
@@ -71,117 +80,185 @@ export default function OrderForm() {
     }
   };
 
-  /* ─────────── STEP 1: 꿈 입력 ─────────── */
+  /* ── 공통 레이아웃 래퍼 ── */
+  const Screen = ({ children }: { children: React.ReactNode }) => (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      background: "#F4F3EE",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+      zIndex: 10,
+    }}>
+      {children}
+    </div>
+  );
+
+  /* ── 공통 헤더 ── */
+  const Header = ({ step: s, title, sub }: { step: number; title: React.ReactNode; sub?: string }) => (
+    <div style={{ padding: "14px 24px 0" }}>
+      <StepBar current={s} total={3} />
+      <p style={{ margin: "12px 0 2px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em" }}>
+        {s} / 3
+      </p>
+      <h1 style={{ margin: 0, fontSize: 22, fontWeight: "bold", color: "#1A1A1A", lineHeight: 1.25, fontFamily: "Georgia, serif" }}>
+        {title}
+      </h1>
+      {sub && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6B6869" }}>{sub}</p>}
+    </div>
+  );
+
+  /* ── 공통 하단 버튼 영역 ── */
+  const Footer = ({ primary, primaryDisabled, onPrimary, onBack, hint }: {
+    primary: React.ReactNode;
+    primaryDisabled?: boolean;
+    onPrimary: () => void;
+    onBack?: () => void;
+    hint?: string;
+  }) => (
+    <div style={{ padding: "10px 24px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {error && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#CC2200" }}>
+          {error}
+        </div>
+      )}
+      <button
+        onClick={onPrimary}
+        disabled={primaryDisabled}
+        style={{
+          background: primaryDisabled ? "#C8C6BF" : "#1A1A1A",
+          color: primaryDisabled ? "#8A8880" : "#F5F0E8",
+          border: "none",
+          borderRadius: 14,
+          padding: "15px 0",
+          fontSize: 15,
+          fontWeight: "bold",
+          cursor: primaryDisabled ? "not-allowed" : "pointer",
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        }}
+      >
+        {loading && (
+          <svg style={{ animation: "spin 1s linear infinite", width: 16, height: 16 }} viewBox="0 0 24 24" fill="none">
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/>
+            <path fill="currentColor" opacity=".75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+          </svg>
+        )}
+        {primary}
+      </button>
+      {onBack && (
+        <button onClick={onBack} style={{
+          background: "transparent", border: "none", color: "#6B6869",
+          fontSize: 13, padding: "6px 0", cursor: "pointer",
+        }}>
+          ← 이전
+        </button>
+      )}
+      {hint && <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: "#AEAAA5" }}>{hint}</p>}
+    </div>
+  );
+
+  /* ─────────── STEP 1 ─────────── */
   if (step === 1) {
     return (
-      <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
-        <StepBar current={1} total={3} />
-
-        <div className="px-6 pt-4 pb-2">
-          <p className="text-xs font-bold text-[#AEAAA5] uppercase tracking-widest">1 / 3</p>
-          <h1 className="font-headline font-bold text-2xl text-[#1A1A1A] mt-1 leading-tight">
-            당신의 꿈을<br />들려주세요
-          </h1>
-          <p className="text-sm text-[#6B6869] mt-1">
-            꿈신문사 기자단이 당신의 이야기를 신문으로 만듭니다
-          </p>
-        </div>
-
-        <div className="flex-1 px-6 pt-4">
+      <Screen>
+        <Header step={1} title={<>당신의 꿈을<br />들려주세요</>} sub="기자단이 당신의 이야기를 신문으로 만듭니다" />
+        <div style={{ flex: 1, padding: "12px 24px 0", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <textarea
             value={form.dream_description}
             onChange={(e) => setForm({ ...form, dream_description: e.target.value })}
             placeholder="예: 구글 코리아의 AI 연구소장이 되어 세계적인 논문을 발표하고, 후배들을 이끄는 리더가 되고 싶습니다..."
-            rows={7}
-            className="app-input resize-none leading-relaxed"
-            style={{ fontFamily: "inherit" }}
             autoFocus
+            style={{
+              flex: 1,
+              width: "100%",
+              resize: "none",
+              border: "1.5px solid #E0DFD8",
+              borderRadius: 14,
+              padding: "14px",
+              fontSize: 14,
+              lineHeight: 1.7,
+              color: "#1A1A1A",
+              background: "#fff",
+              fontFamily: "inherit",
+              outline: "none",
+              boxSizing: "border-box",
+              minHeight: 0,
+            }}
           />
-          <div className="flex justify-between mt-1.5 px-1">
-            <span className="text-xs text-[#AEAAA5]">최소 10자 이상</span>
-            <span className={`text-xs font-bold ${
-              form.dream_description.length >= 10 ? "text-[#1A1A1A]" : "text-[#AEAAA5]"
-            }`}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 2px 0", fontSize: 11, color: "#AEAAA5" }}>
+            <span>최소 10자 이상</span>
+            <span style={{ fontWeight: "bold", color: form.dream_description.length >= 10 ? "#1A1A1A" : "#AEAAA5" }}>
               {form.dream_description.length}자
             </span>
           </div>
         </div>
-
-        <div className="px-6 pb-8 pt-4 space-y-3">
-          <button
-            onClick={() => setStep(2)}
-            disabled={!canNext1}
-            className="app-btn-primary disabled:opacity-40"
-          >
-            다음 →
-          </button>
-        </div>
-      </div>
+        <Footer
+          primary="다음 →"
+          primaryDisabled={!canNext1}
+          onPrimary={() => setStep(2)}
+        />
+      </Screen>
     );
   }
 
-  /* ─────────── STEP 2: 주인공 정보 ─────────── */
+  /* ─────────── STEP 2 ─────────── */
   if (step === 2) {
+    const Input = ({ label, value, onChange, placeholder, autoFocus }: {
+      label: string; value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean;
+    }) => (
+      <div>
+        <p style={{ margin: "0 0 5px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em", textTransform: "uppercase" }}>{label}</p>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          style={{
+            width: "100%", border: "1.5px solid #E0DFD8", borderRadius: 12,
+            padding: "11px 14px", fontSize: 14, color: "#1A1A1A",
+            background: "#fff", outline: "none", boxSizing: "border-box",
+          }}
+        />
+      </div>
+    );
+
     return (
-      <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
-        <StepBar current={2} total={3} />
-
-        <div className="px-6 pt-4 pb-2">
-          <p className="text-xs font-bold text-[#AEAAA5] uppercase tracking-widest">2 / 3</p>
-          <h1 className="font-headline font-bold text-2xl text-[#1A1A1A] mt-1 leading-tight">
-            신문의 주인공은<br />누구인가요?
-          </h1>
-          <p className="text-sm text-[#6B6869] mt-1">기사에 실명으로 등장합니다</p>
-        </div>
-
-        <div className="flex-1 px-6 pt-4 space-y-3">
+      <Screen>
+        <Header step={2} title={<>신문의 주인공은<br />누구인가요?</>} sub="기사에 실명으로 등장합니다" />
+        <div style={{ flex: 1, padding: "12px 24px 0", display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
+          <Input label="이름 *" value={form.protagonist_name}
+            onChange={(v) => setForm({ ...form, protagonist_name: v })}
+            placeholder="홍길동" autoFocus />
+          <Input label="목표 역할 *" value={form.target_role}
+            onChange={(v) => setForm({ ...form, target_role: v })}
+            placeholder="예: AI 연구소장, 스타트업 대표" />
+          <Input label="목표 회사 (선택)" value={form.target_company || ""}
+            onChange={(v) => setForm({ ...form, target_company: v })}
+            placeholder="예: 삼성전자, Google" />
           <div>
-            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">이름 *</label>
-            <input
-              type="text"
-              value={form.protagonist_name}
-              onChange={(e) => setForm({ ...form, protagonist_name: e.target.value })}
-              placeholder="홍길동"
-              className="app-input"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">목표 역할 *</label>
-            <input
-              type="text"
-              value={form.target_role}
-              onChange={(e) => setForm({ ...form, target_role: e.target.value })}
-              placeholder="예: AI 연구소장, 시리즈A 스타트업 대표"
-              className="app-input"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">목표 회사 (선택)</label>
-            <input
-              type="text"
-              value={form.target_company || ""}
-              onChange={(e) => setForm({ ...form, target_company: e.target.value })}
-              placeholder="예: 삼성전자, Google, 자체 스타트업"
-              className="app-input"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-1.5 block">꿈이 이루어지는 해</label>
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em", textTransform: "uppercase" }}>꿈이 이루어지는 해</p>
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
               {FUTURE_YEARS.map((year) => (
-                <button
-                  key={year}
-                  type="button"
+                <button key={year} type="button"
                   onClick={() => setForm({ ...form, future_year: year })}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                    form.future_year === year
-                      ? "bg-[#1A1A1A] text-white"
-                      : "bg-white text-[#6B6869] border border-[#E0DFD8]"
-                  }`}
+                  style={{
+                    flexShrink: 0,
+                    padding: "7px 14px",
+                    borderRadius: 99,
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    border: form.future_year === year ? "none" : "1.5px solid #E0DFD8",
+                    background: form.future_year === year ? "#1A1A1A" : "#fff",
+                    color: form.future_year === year ? "#fff" : "#6B6869",
+                    cursor: "pointer",
+                  }}
                 >
                   {year}년
                 </button>
@@ -189,156 +266,129 @@ export default function OrderForm() {
             </div>
           </div>
         </div>
-
-        <div className="px-6 pb-8 pt-4 space-y-3">
-          <button
-            onClick={() => setStep(3)}
-            disabled={!canNext2}
-            className="app-btn-primary disabled:opacity-40"
-          >
-            다음 →
-          </button>
-          <button
-            onClick={() => setStep(1)}
-            className="app-btn-secondary"
-          >
-            ← 이전
-          </button>
-        </div>
-      </div>
+        <Footer
+          primary="다음 →"
+          primaryDisabled={!canNext2}
+          onPrimary={() => setStep(3)}
+          onBack={() => setStep(1)}
+        />
+      </Screen>
     );
   }
 
-  /* ─────────── STEP 3: 플랜 선택 ─────────── */
-  return (
-    <div className="min-h-screen bg-[#F4F3EE] flex flex-col">
-      <StepBar current={3} total={3} />
-
-      <div className="px-6 pt-4 pb-2">
-        <p className="text-xs font-bold text-[#AEAAA5] uppercase tracking-widest">3 / 3</p>
-        <h1 className="font-headline font-bold text-2xl text-[#1A1A1A] mt-1 leading-tight">
-          어떻게<br />시작할까요?
-        </h1>
-      </div>
-
-      <div className="flex-1 px-6 pt-4 space-y-3">
-        {/* 무료 플랜 */}
-        <button
-          type="button"
-          onClick={() => setForm({ ...form, payment_type: "free", duration_days: 7 })}
-          className={`w-full app-card p-5 text-left transition-all ${
-            isFree ? "ring-2 ring-[#1A1A1A]" : "active:bg-[#F2F1EB]"
-          }`}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <span className="badge-active mb-2 inline-block">무료</span>
-              <h3 className="font-headline font-bold text-[#1A1A1A] text-base">기자단 체험</h3>
-              <p className="text-xs text-[#6B6869] mt-0.5">7일 시리즈 · 결제 없이 즉시 시작</p>
-            </div>
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
-              isFree ? "border-[#1A1A1A] bg-[#1A1A1A]" : "border-[#E0DFD8]"
-            }`}>
-              {isFree && (
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-3 text-xs text-[#AEAAA5] mt-3">
-            <span>✓ AI 기자단 작성</span>
-            <span>✓ 매일 아침 발행</span>
-            <span>✓ 스폰서 자동 매칭</span>
-          </div>
-        </button>
-
-        {/* 프리미엄 플랜 */}
-        <button
-          type="button"
-          onClick={() => setForm({ ...form, payment_type: "one_time", duration_days: form.duration_days === 7 ? 14 : form.duration_days })}
-          className={`w-full app-card p-5 text-left transition-all ${
-            !isFree ? "ring-2 ring-[#1A1A1A]" : "active:bg-[#F2F1EB]"
-          }`}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <span className="bg-[#1A1A1A] text-white text-xs font-bold px-2.5 py-1 rounded-full mb-2 inline-block">프리미엄</span>
-              <h3 className="font-headline font-bold text-[#1A1A1A] text-base">전담 기자 시리즈</h3>
-              <p className="text-xs text-[#6B6869] mt-0.5">14일 / 30일 · 카드 결제</p>
-            </div>
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
-              !isFree ? "border-[#1A1A1A] bg-[#1A1A1A]" : "border-[#E0DFD8]"
-            }`}>
-              {!isFree && (
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-3 text-xs text-[#AEAAA5] mt-3">
-            <span>✓ 전담 기자 배정</span>
-            <span>✓ 더 깊은 이야기</span>
-            <span>✓ 우선 발행</span>
-          </div>
-        </button>
-
-        {/* 기간 선택 (프리미엄만) */}
-        {!isFree && (
-          <div className="app-card p-4">
-            <p className="text-xs font-bold text-[#6B6869] uppercase tracking-widest mb-3">시리즈 기간</p>
-            <div className="grid grid-cols-2 gap-2">
-              {DURATION_OPTIONS.filter((o) => o.days !== 7).map((opt) => (
-                <button
-                  key={opt.days}
-                  type="button"
-                  onClick={() => setForm({ ...form, duration_days: opt.days })}
-                  className={`p-3 rounded-xl text-center transition-all border ${
-                    form.duration_days === opt.days
-                      ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                      : "bg-white text-[#1A1A1A] border-[#E0DFD8]"
-                  }`}
-                >
-                  <div className="font-headline font-bold text-base">{opt.label}</div>
-                  <div className="text-xs mt-0.5 opacity-70">{opt.priceLabel}</div>
-                  <div className="text-xs opacity-50">{opt.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-[#CC2200]">
-            {error}
-          </div>
-        )}
-      </div>
-
-      <div className="px-6 pb-8 pt-4 space-y-3">
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="app-btn-primary disabled:opacity-50"
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-              </svg>
-              꿈을 준비하는 중...
-            </span>
-          ) : isFree ? "무료로 시작하기 🗞" : "결제하고 시작하기"}
-        </button>
-        <button onClick={() => setStep(2)} className="app-btn-secondary">
-          ← 이전
-        </button>
-        <p className="text-center text-xs text-[#AEAAA5]">
-          제출 후 내일 오전 8시부터 신문이 발행됩니다
-        </p>
-      </div>
+  /* ─────────── STEP 3 ─────────── */
+  const Checkmark = ({ on }: { on: boolean }) => (
+    <div style={{
+      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+      border: on ? "none" : "1.5px solid #E0DFD8",
+      background: on ? "#1A1A1A" : "transparent",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {on && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
     </div>
+  );
+
+  const submitLabel = () => {
+    if (loading) return "준비 중...";
+    if (isFree) return "무료로 시작하기 🗞";
+    if (isCredits) return `${selectedOption.credits}크레딧으로 시작하기`;
+    return "결제하고 시작하기";
+  };
+
+  return (
+    <Screen>
+      <Header step={3} title={<>어떻게<br />시작할까요?</>} />
+
+      {/* 크레딧 잔액 */}
+      {creditBalance !== null && (
+        <div style={{ padding: "4px 24px 0", display: "flex", gap: 4, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#6B6869" }}>
+            보유 <strong style={{ color: "#1A1A1A" }}>{creditBalance}크레딧</strong>
+          </span>
+          <span style={{ fontSize: 11, color: "#AEAAA5" }}>·</span>
+          <Link href="/credits" style={{ fontSize: 12, color: "#CC2200", textDecoration: "underline" }}>충전하기</Link>
+        </div>
+      )}
+
+      <div style={{ flex: 1, padding: "10px 24px 0", display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
+
+        {/* 무료 카드 */}
+        <button type="button"
+          onClick={() => setForm({ ...form, payment_type: "free", duration_days: 7 })}
+          style={{
+            background: "#fff", border: isFree ? "2px solid #1A1A1A" : "1.5px solid #E0DFD8",
+            borderRadius: 14, padding: "14px 16px", textAlign: "left", cursor: "pointer", width: "100%",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+          <div>
+            <span style={{ display: "inline-block", background: "#D4F1DE", color: "#1A6B35", fontSize: 10, fontWeight: "bold", padding: "2px 8px", borderRadius: 99, marginBottom: 4 }}>무료</span>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1A1A1A" }}>7일 체험 시리즈</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6B6869" }}>결제 없이 즉시 시작</p>
+          </div>
+          <Checkmark on={isFree} />
+        </button>
+
+        {/* 크레딧 카드 */}
+        <button type="button"
+          onClick={() => setForm({ ...form, payment_type: "credits", duration_days: form.duration_days === 7 ? 14 : form.duration_days })}
+          style={{
+            background: "#fff", border: isCredits ? "2px solid #1A1A1A" : "1.5px solid #E0DFD8",
+            borderRadius: 14, padding: "14px 16px", textAlign: "left", cursor: "pointer", width: "100%",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+          <div>
+            <span style={{ display: "inline-block", background: "#1A1A1A", color: "#fff", fontSize: 10, fontWeight: "bold", padding: "2px 8px", borderRadius: 99, marginBottom: 4 }}>크레딧</span>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1A1A1A" }}>보유 크레딧으로 시작</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: creditBalance === 0 ? "#CC2200" : "#6B6869" }}>
+              {creditBalance === null ? "로딩 중..." : creditBalance > 0 ? `${creditBalance}크레딧 보유 · 즉시 시작` : "크레딧 없음 — 충전 필요"}
+            </p>
+          </div>
+          <Checkmark on={isCredits} />
+        </button>
+
+        {/* 기간 선택 (크레딧 선택 시만) */}
+        {isCredits && (
+          <div style={{ background: "#fff", border: "1.5px solid #E0DFD8", borderRadius: 14, padding: "12px 14px" }}>
+            <p style={{ margin: "0 0 8px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em", textTransform: "uppercase" }}>시리즈 기간</p>
+            <div style={{ display: "flex", gap: 6 }}>
+              {DURATION_OPTIONS.map((opt) => {
+                const insufficient = creditBalance !== null && creditBalance < opt.credits;
+                const isSelected = form.duration_days === opt.days;
+                return (
+                  <button key={opt.days} type="button"
+                    onClick={() => !insufficient && setForm({ ...form, duration_days: opt.days })}
+                    style={{
+                      flex: 1, padding: "10px 4px", borderRadius: 10, textAlign: "center", cursor: insufficient ? "not-allowed" : "pointer",
+                      border: isSelected ? "none" : "1.5px solid #E0DFD8",
+                      background: isSelected ? "#1A1A1A" : insufficient ? "#F4F3EE" : "#fff",
+                      color: isSelected ? "#fff" : insufficient ? "#AEAAA5" : "#1A1A1A",
+                    }}>
+                    <div style={{ fontSize: 13, fontWeight: "bold" }}>{opt.label}</div>
+                    <div style={{ fontSize: 11, marginTop: 1, opacity: 0.7 }}>{opt.credits}크레딧</div>
+                  </button>
+                );
+              })}
+            </div>
+            {isCredits && !hasEnoughCredits && (
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
+                <p style={{ margin: 0, fontSize: 11, color: "#CC2200" }}>
+                  {selectedOption.credits - (creditBalance ?? 0)}크레딧 부족
+                </p>
+                <Link href="/credits" style={{ fontSize: 11, fontWeight: "bold", color: "#CC2200" }}>충전하기 →</Link>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+
+      <Footer
+        primary={submitLabel()}
+        primaryDisabled={loading || (isCredits && !hasEnoughCredits)}
+        onPrimary={handleSubmit}
+        onBack={() => setStep(2)}
+        hint="제출 후 첫 신문이 곧 발행됩니다"
+      />
+    </Screen>
   );
 }

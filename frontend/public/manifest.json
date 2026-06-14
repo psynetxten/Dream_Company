@@ -25,7 +25,7 @@
       "name": "오늘의 신문",
       "short_name": "오늘 신문",
       "description": "가장 최근 발행된 신문 보기",
-      "url": "/dashboard",
+      "url": "/",
       "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
     },
     {

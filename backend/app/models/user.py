@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, func, Uuid
+from sqlalchemy import String, Boolean, DateTime, Integer, func, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -31,13 +31,12 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # 구독 정보
-    subscription_plan: Mapped[str | None] = mapped_column(
-        String(20), nullable=True
-    )  # monthly | yearly | None
-    subscription_expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    # 크레딧 잔액
+    credits: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+    # 구독 정보 (레거시)
+    subscription_plan: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    subscription_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -61,4 +60,7 @@ class User(Base):
     )
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    credit_transactions: Mapped[list["CreditTransaction"]] = relationship(  # noqa: F821
+        "CreditTransaction", back_populates="user", cascade="all, delete-orphan"
     )

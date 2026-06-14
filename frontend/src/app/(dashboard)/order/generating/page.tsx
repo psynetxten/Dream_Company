@@ -1,124 +1,128 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const STAGES = [
-  { key: "starting", label: "편집국이 꿈을 분석하고 있습니다" },
-  { key: "sponsor_matching", label: "맞춤 스폰서를 찾고 있습니다" },
-  { key: "writing", label: "기자단이 기사를 작성하고 있습니다" },
-  { key: "quality_check", label: "편집장이 검수하고 있습니다" },
-  { key: "done", label: "신문이 완성됐습니다! 🎉" },
-];
+const STAGE_ORDER = ["starting", "sponsor_matching", "writing", "done"] as const;
+type StageName = (typeof STAGE_ORDER)[number] | "idle" | "failed";
 
-type StageKey = (typeof STAGES)[number]["key"];
+/* ──────────────────────────────────────────────
+   타이핑 로그 훅
+   — 메시지 큐에서 하나씩 꺼내 28ms 간격으로 타이핑
+────────────────────────────────────────────── */
+function useTypingLog() {
+  const [completedLines, setCompletedLines] = useState<string[]>([]);
+  const [currentText, setCurrentText] = useState("");
+  const targetRef = useRef("");
+  const progressRef = useRef(0);
+  const queueRef = useRef<string[]>([]);
 
-function StageIcon({ state }: { state: "done" | "active" | "pending" }) {
-  if (state === "done") {
-    return (
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          background: "#F5F0E8",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M3 8L6.5 11.5L13 5"
-            stroke="#1A1A1A"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const id = setInterval(() => {
+      const target = targetRef.current;
+      const progress = progressRef.current;
 
-  if (state === "active") {
-    return (
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          border: "2px solid #F5F0E8",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            width: 16,
-            height: 16,
-            border: "2px solid transparent",
-            borderTop: "2px solid #F5F0E8",
-            borderRadius: "50%",
-            animation: "spin 0.8s linear infinite",
-          }}
-        />
-      </div>
-    );
-  }
+      if (progress < target.length) {
+        progressRef.current = progress + 1;
+        setCurrentText(target.slice(0, progress + 1));
+      } else if (queueRef.current.length > 0) {
+        if (target) setCompletedLines((l) => [...l, target]);
+        const next = queueRef.current.shift()!;
+        targetRef.current = next;
+        progressRef.current = 0;
+        setCurrentText("");
+      }
+    }, 55);
+    return () => clearInterval(id);
+  }, []);
 
-  return (
-    <div
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: "50%",
-        border: "2px solid #3A3A3A",
-        flexShrink: 0,
-      }}
-    />
-  );
+  const enqueue = useCallback((msg: string) => {
+    queueRef.current.push(msg);
+  }, []);
+
+  return { completedLines, currentText, enqueue };
 }
 
+/* ──────────────────────────────────────────────
+   메인 컴포넌트
+────────────────────────────────────────────── */
 function GeneratingContent() {
   const router = useRouter();
   const params = useSearchParams();
   const orderId = params.get("orderId");
-  const [completedStages, setCompletedStages] = useState<StageKey[]>([]);
-  const [currentStage, setCurrentStage] = useState<StageKey | null>(null);
-  const [isDone, setIsDone] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003";
+  const name = params.get("name") || "";
+  const role = params.get("role") || "";
 
+  const [stage, setStage] = useState<StageName>("idle");
+  const [sponsorCompany, setSponsorCompany] = useState<string | null>(null);
+  const [dreamCount, setDreamCount] = useState<number | null>(null);
+  const [showDreamCount, setShowDreamCount] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const { completedLines, currentText, enqueue } = useTypingLog();
+  const logEndRef = useRef<HTMLDivElement>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003";
+
+  // 로그 자동 스크롤
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [completedLines.length, currentText]);
+
+  // 같은 꿈 인원 수 조회
+  useEffect(() => {
+    if (!role) return;
+    fetch(`${apiUrl}/api/v1/orders/dream-stats?role=${encodeURIComponent(role)}`)
+      .then((r) => r.json())
+      .then((d) => setDreamCount(typeof d.count === "number" ? d.count : null))
+      .catch(() => {});
+  }, [role, apiUrl]);
+
+  // SSE 연결
   useEffect(() => {
     if (!orderId) return;
-
-    const es = new EventSource(
-      `${apiUrl}/api/v1/orders/${orderId}/progress`
-    );
+    const es = new EventSource(`${apiUrl}/api/v1/orders/${orderId}/progress`);
 
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.stage === "ping") return;
 
-      if (data.stage === "done") {
-        setCompletedStages(STAGES.map((s) => s.key as StageKey));
-        setCurrentStage("done");
-        setIsDone(true);
+      if (data.stage === "starting") {
+        setStage("starting");
+        enqueue("편집장이 꿈을 검토하고 있습니다...");
+        enqueue("✓ 기사화 가치: 최상 ★★★★★");
+        // sponsor_matching까지 ~26초 빈 구간 채우기
+        enqueue("광고팀에 스폰서 탐색을 요청했습니다...");
+        enqueue("전국 기업 데이터베이스 검색 중...");
+        enqueue("산업군 · 미션 · 성장성 기준으로 필터링 중...");
+        enqueue("꿈의 키워드와 기업 가치관 매칭 중...");
+        enqueue("상위 후보군 선별 — 적합도 점수 산출 중...");
+        enqueue("최종 스폰서를 선정하고 있습니다...");
+      } else if (data.stage === "sponsor_matching") {
+        const company = data.sponsor_company || null;
+        setSponsorCompany(company);
+        setStage("sponsor_matching");
+        if (company) {
+          enqueue(`👀 ${company}가 관심을 표명했습니다`);
+        }
+        setShowDreamCount(true);
+      } else if (data.stage === "writing") {
+        setStage("writing");
+        // writing→done 사이 ~65초 빈 구간 채우기
+        enqueue("수석 기자를 배정했습니다 — 취재 시작...");
+        enqueue("미래 현장 묘사 작성 중...");
+        enqueue("인터뷰 내용 구성 중...");
+        enqueue("전문가 코멘트 삽입 중...");
+        enqueue("헤드라인 · 서브헤드 조율 중...");
+        enqueue("기사 전체 톤 및 밸런스 검토 중...");
+        enqueue("SNS 배포 문구 작성 중...");
+        enqueue("최종 교열 완료 중...");
+      } else if (data.stage === "done") {
+        setStage("done");
+        enqueue("✓ 신문 완성! 잠시 후 이동합니다");
         es.close();
         setTimeout(() => {
           router.push(`/newspapers/${orderId}`);
-        }, 3000);
-      } else {
-        const stageKey = data.stage as StageKey;
-        setCurrentStage(stageKey);
-        const idx = STAGES.findIndex((s) => s.key === stageKey);
-        setCompletedStages(
-          STAGES.slice(0, idx).map((s) => s.key as StageKey)
-        );
+        }, 3500);
       }
     };
 
@@ -136,20 +140,17 @@ function GeneratingContent() {
       es.close();
       clearTimeout(timeout);
     };
-  }, [orderId, apiUrl, router]);
+  }, [orderId, apiUrl, router, enqueue]);
 
-  const getStageState = (key: StageKey): "done" | "active" | "pending" => {
-    if (completedStages.includes(key)) return "done";
-    if (currentStage === key) return "active";
-    return "pending";
-  };
+  const stageIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
 
+  /* ── 실패 화면 ── */
   if (failed) {
     return (
       <div
         style={{
           minHeight: "100vh",
-          background: "#1A1A1A",
+          background: "#0F0F0F",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -203,153 +204,248 @@ function GeneratingContent() {
   return (
     <>
       <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
+        @keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .cursor { animation: blink 1s step-end infinite; color: #CC2200; }
       `}</style>
 
       <div
         style={{
           minHeight: "100vh",
-          background: "#1A1A1A",
+          background: "#0F0F0F",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "40px 24px",
+          padding: "48px 24px 40px",
+          gap: 20,
         }}
       >
         {/* 헤더 */}
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: 48,
-            animation: "fadeIn 0.5s ease",
-          }}
-        >
-          <div style={{ fontSize: 56, marginBottom: 16 }}>🗞️</div>
-          <h1
-            style={{
-              color: "#F5F0E8",
-              fontSize: 24,
-              fontWeight: "bold",
-              margin: 0,
-              letterSpacing: "-0.5px",
-            }}
-          >
-            꿈신문 제작 중
-          </h1>
+        <div style={{ textAlign: "center" }}>
           <p
             style={{
-              color: "#6B6869",
-              fontSize: 14,
-              marginTop: 8,
-              animation: "pulse 2s ease infinite",
+              margin: 0,
+              fontSize: 10,
+              color: "#CC2200",
+              letterSpacing: "0.3em",
+              fontWeight: "bold",
+              textTransform: "uppercase",
             }}
           >
-            편집국이 열심히 당신의 신문을 만들고 있습니다
+            DREAM NEWSPAPER 편집국
           </p>
+          <h2
+            style={{
+              margin: "6px 0 0",
+              fontSize: 18,
+              fontWeight: "bold",
+              color: "#F5F0E8",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              lineHeight: 1.3,
+            }}
+          >
+            {name ? `${name}의 꿈을 기사화하고 있습니다` : "꿈을 기사화하고 있습니다"}
+          </h2>
         </div>
 
-        {/* 단계 목록 */}
+        {/* 편집국 실황 터미널 */}
         <div
           style={{
             width: "100%",
             maxWidth: 360,
-            animation: "fadeIn 0.6s ease 0.1s both",
+            background: "#1A1A1A",
+            borderRadius: 12,
+            border: "1px solid #2A2A2A",
+            overflow: "hidden",
           }}
         >
-          {STAGES.map((stage, idx) => {
-            const state = getStageState(stage.key as StageKey);
-            const isLast = idx === STAGES.length - 1;
+          <div
+            style={{
+              padding: "8px 14px",
+              borderBottom: "1px solid #2A2A2A",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "#CC2200",
+                display: "inline-block",
+              }}
+            />
+            <span style={{ color: "#6B6869", fontSize: 10, letterSpacing: "0.15em" }}>
+              편집국 실황
+            </span>
+            {stage !== "idle" && stage !== "done" && (
+              <span
+                style={{
+                  marginLeft: "auto",
+                  color: "#CC2200",
+                  fontSize: 9,
+                  fontWeight: "bold",
+                  animation: "pulse 1.6s ease infinite",
+                }}
+              >
+                ● LIVE
+              </span>
+            )}
+            {stage === "done" && (
+              <span
+                style={{ marginLeft: "auto", color: "#5BB974", fontSize: 9, fontWeight: "bold" }}
+              >
+                ● 완료
+              </span>
+            )}
+          </div>
 
-            return (
-              <div key={stage.key} style={{ display: "flex" }}>
-                {/* 아이콘 + 연결선 */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    marginRight: 16,
-                  }}
-                >
-                  <StageIcon state={state} />
-                  {!isLast && (
-                    <div
-                      style={{
-                        width: 2,
-                        flex: 1,
-                        minHeight: 24,
-                        background:
-                          state === "done" ? "#F5F0E8" : "#2A2A2A",
-                        margin: "4px 0",
-                        transition: "background 0.4s ease",
-                      }}
-                    />
-                  )}
-                </div>
+          <div
+            style={{
+              padding: "14px 16px",
+              minHeight: 100,
+              maxHeight: 200,
+              overflowY: "auto",
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: 12,
+              lineHeight: 1.8,
+            }}
+          >
+            {stage === "idle" && completedLines.length === 0 && !currentText && (
+              <span style={{ color: "#333" }}>
+                편집국에 연결하는 중...<span className="cursor">|</span>
+              </span>
+            )}
 
-                {/* 텍스트 */}
-                <div
-                  style={{
-                    paddingTop: 4,
-                    paddingBottom: isLast ? 0 : 24,
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 15,
-                      fontWeight: state === "active" ? "bold" : "normal",
-                      color:
-                        state === "done"
-                          ? "#F5F0E8"
-                          : state === "active"
-                          ? "#F5F0E8"
-                          : "#3A3A3A",
-                      transition: "color 0.3s ease",
-                    }}
-                  >
-                    {stage.label}
-                  </p>
-                  {state === "active" && stage.key !== "done" && (
-                    <p
-                      style={{
-                        margin: "4px 0 0",
-                        fontSize: 12,
-                        color: "#6B6869",
-                        animation: "pulse 1.5s ease infinite",
-                      }}
-                    >
-                      진행 중...
-                    </p>
-                  )}
-                </div>
+            {completedLines.map((line, i) => (
+              <div key={i} style={{ color: "#6B6869" }}>
+                {line}
               </div>
+            ))}
+
+            {currentText && (
+              <div style={{ color: "#F5F0E8" }}>
+                {currentText}
+                <span className="cursor">|</span>
+              </div>
+            )}
+
+            <div ref={logEndRef} />
+          </div>
+        </div>
+
+        {/* 스폰서 관심 카드 */}
+        {sponsorCompany && (
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              background: "#1A1A1A",
+              borderRadius: 12,
+              border: "1px solid #CC2200",
+              padding: "14px 16px",
+              animation: "fadeIn 0.5s ease",
+            }}
+          >
+            <p
+              style={{
+                margin: "0 0 10px",
+                fontSize: 9,
+                color: "#CC2200",
+                fontWeight: "bold",
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+              }}
+            >
+              스폰서 관심
+            </p>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>👀</span>
+              <div>
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#F5F0E8",
+                    fontWeight: "bold",
+                    fontSize: 16,
+                    fontFamily: "Georgia, serif",
+                  }}
+                >
+                  {sponsorCompany}
+                </p>
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    color: "#AEAAA5",
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {name ? `${name}님의 기사에` : "이 기사에"} 스폰서로
+                  <br />
+                  참여를 검토하고 있습니다
+                </p>
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 10,
+                borderTop: "1px solid #2A2A2A",
+              }}
+            >
+              <p style={{ margin: 0, color: "#3A3A3A", fontSize: 10, lineHeight: 1.5 }}>
+                협찬이 확정되면 기사 안에 자연스럽게 등장합니다 — 독자에게 광고처럼 느껴지지 않습니다
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* 같은 꿈 인원 수 — sponsor 카드 다음에 등장 */}
+        {showDreamCount && dreamCount !== null && (
+          <p
+            style={{
+              margin: 0,
+              color: "#3A3A3A",
+              fontSize: 12,
+              textAlign: "center",
+              animation: "fadeIn 0.6s ease",
+            }}
+          >
+            {dreamCount === 0
+              ? `🌟 ${role || "이 꿈"}의 첫 번째 의뢰입니다`
+              : `👥 같은 꿈을 키우고 있는 사람: ${dreamCount.toLocaleString()}명`}
+          </p>
+        )}
+
+        {/* 진행 점 바 */}
+        <div style={{ display: "flex", gap: 5, justifyContent: "center", alignItems: "center" }}>
+          {STAGE_ORDER.map((s, i) => {
+            const isPast = i < stageIdx;
+            const isCurrent = i === stageIdx;
+            return (
+              <div
+                key={s}
+                style={{
+                  height: 5,
+                  width: isCurrent ? 22 : isPast ? 14 : 5,
+                  borderRadius: 3,
+                  background: isPast ? "#F5F0E8" : isCurrent ? "#CC2200" : "#2A2A2A",
+                  transition: "all 0.5s ease",
+                }}
+              />
             );
           })}
         </div>
 
-        {/* 완료 후 버튼 */}
-        {isDone && (
-          <div
-            style={{
-              marginTop: 48,
-              textAlign: "center",
-              animation: "fadeIn 0.5s ease",
-            }}
-          >
-            <p style={{ color: "#6B6869", fontSize: 13, marginBottom: 16 }}>
+        {/* 완료 CTA */}
+        {stage === "done" && (
+          <div style={{ textAlign: "center", animation: "fadeIn 0.5s ease" }}>
+            <p style={{ color: "#6B6869", fontSize: 12, margin: "0 0 14px" }}>
               3초 후 신문으로 이동합니다...
             </p>
             <button
@@ -370,18 +466,9 @@ function GeneratingContent() {
           </div>
         )}
 
-        {/* 하단 안내 */}
-        {!isDone && (
-          <p
-            style={{
-              color: "#3A3A3A",
-              fontSize: 12,
-              marginTop: 48,
-              textAlign: "center",
-              animation: "fadeIn 0.6s ease 0.3s both",
-            }}
-          >
-            보통 2~3분 소요됩니다
+        {stage !== "done" && (
+          <p style={{ color: "#2A2A2A", fontSize: 11, margin: 0 }}>
+            보통 1~2분 소요됩니다
           </p>
         )}
       </div>
@@ -396,7 +483,7 @@ export default function GeneratingPage() {
         <div
           style={{
             minHeight: "100vh",
-            background: "#1A1A1A",
+            background: "#0F0F0F",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

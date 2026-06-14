@@ -45,7 +45,7 @@ export function middleware(request: NextRequest) {
           ? "/writer/dashboard"
           : role === "sponsor"
           ? "/sponsor/dashboard"
-          : "/dashboard";
+          : "/";
       return NextResponse.redirect(new URL(home, request.url));
     }
   }
@@ -57,7 +57,7 @@ export function middleware(request: NextRequest) {
         ? "/writer/dashboard"
         : role === "sponsor"
         ? "/sponsor/dashboard"
-        : "/dashboard";
+        : "/";
     return NextResponse.redirect(new URL(home, request.url));
   }
 
