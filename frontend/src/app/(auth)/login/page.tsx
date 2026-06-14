@@ -50,7 +50,11 @@ function LoginForm() {
       );
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.detail || "로그인에 실패했습니다.");
+      if (!response.ok) {
+        const detail = result.detail;
+        const msg = typeof detail === "string" ? detail : "이메일 또는 비밀번호가 올바르지 않습니다.";
+        throw new Error(msg);
+      }
 
       const { error: sessionError } = await supabase.auth.setSession({
         access_token: result.access_token,
