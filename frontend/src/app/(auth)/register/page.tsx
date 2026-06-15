@@ -17,7 +17,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      await registerAndLogin(form.email, form.password, form.full_name, "user", API_URL, "/onboarding");
+      await registerAndLogin(form.email, form.password, form.full_name, "user", API_URL);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "회원가입 중 오류가 발생했습니다.";

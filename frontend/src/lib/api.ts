@@ -70,6 +70,7 @@ export const authApi = {
   login: (data: { email: string; password: string }) =>
     api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
+  updateMe: (data: { full_name?: string; role?: string }) => api.patch("/auth/me", data),
 };
 
 // 의뢰

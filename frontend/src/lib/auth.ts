@@ -33,7 +33,7 @@ export async function getUserRole(): Promise<string> {
 export function roleToHome(role: string): string {
   if (role === "writer") return "/writer/dashboard";
   if (role === "sponsor") return "/sponsor/dashboard";
-  return "/";
+  return "/dashboard";
 }
 
 /**

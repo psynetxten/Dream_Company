@@ -1,9 +1,88 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ordersApi, Order } from "@/lib/api";
+import { ordersApi, authApi, Order } from "@/lib/api";
 import AppBar from "@/components/AppBar";
+import { setRoleCookie, roleToHome } from "@/lib/auth";
+
+const ROLES = [
+  { value: "user", label: "일반 사용자", desc: "꿈 신문을 받아보고 싶어요" },
+  { value: "writer", label: "기자단", desc: "꿈 신문을 직접 써보고 싶어요" },
+  { value: "sponsor", label: "스폰서", desc: "기업으로 참여하고 싶어요" },
+];
+
+function SetupModal({ onComplete }: { onComplete: () => void }) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("user");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { setError("이름을 입력해주세요."); return; }
+    setLoading(true);
+    try {
+      await authApi.updateMe({ full_name: name.trim(), role });
+      setRoleCookie(role);
+      router.replace(roleToHome(role));
+      onComplete();
+    } catch {
+      setError("저장에 실패했습니다. 다시 시도해주세요.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
+      <div style={{ background: "#F4F3EE", borderRadius: 24, padding: "2rem 1.5rem", maxWidth: 400, width: "100%" }}>
+        <p className="font-headline font-bold text-sm text-[#AEAAA5] mb-1">꿈신문사</p>
+        <h2 className="font-headline font-bold text-2xl text-[#1A1A1A] mb-1">반갑습니다!</h2>
+        <p className="text-sm text-[#6B6869] mb-6">이름과 역할을 알려주세요</p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="이름"
+            required
+            className="app-input"
+            autoFocus
+          />
+
+          <div className="space-y-2">
+            {ROLES.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => setRole(r.value)}
+                style={{
+                  width: "100%", textAlign: "left", padding: "0.875rem 1rem",
+                  borderRadius: 14, border: `2px solid ${role === r.value ? "#1A1A1A" : "#E0DFD8"}`,
+                  background: role === r.value ? "#1A1A1A" : "#fff",
+                  color: role === r.value ? "#fff" : "#1A1A1A",
+                  transition: "all 0.15s",
+                }}
+              >
+                <p className="font-bold text-sm">{r.label}</p>
+                <p style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>{r.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          {error && <p className="text-sm text-[#CC2200]">{error}</p>}
+
+          <button type="submit" disabled={loading} className="app-btn-primary disabled:opacity-50 mt-2">
+            {loading ? "저장 중..." : "시작하기"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function SkeletonCard() {
   return (
@@ -26,8 +105,14 @@ function StatusBadge({ status }: { status: string }) {
 export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSetup, setShowSetup] = useState(false);
 
   useEffect(() => {
+    authApi.me().then((res) => {
+      const name = res.data?.full_name;
+      if (!name || name === "꿈 참여자") setShowSetup(true);
+    }).catch(() => {});
+
     ordersApi
       .list()
       .then((res) => setOrders(res.data))
@@ -40,6 +125,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F3EE]">
+      {showSetup && <SetupModal onComplete={() => setShowSetup(false)} />}
       <AppBar title="내 꿈 시리즈" showBack backHref="/" />
 
       <div className="pt-safe-header pb-safe-nav px-4 space-y-6 max-w-lg mx-auto">

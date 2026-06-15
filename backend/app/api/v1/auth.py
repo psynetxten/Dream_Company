@@ -8,7 +8,7 @@ from datetime import timedelta, datetime, timezone
 from app.database import get_db
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
-from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
+from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse, UserProfileUpdate
 from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_jwt
 from app.core.exceptions import raise_conflict, raise_unauthorized
 from app.config import settings
@@ -174,4 +174,21 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """내 정보 조회 (Supabase 토큰 필요)"""
+    return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """이름/역할 업데이트 — 신규 소셜 로그인 유저 온보딩용"""
+    allowed_roles = {"user", "writer", "sponsor"}
+    if data.full_name is not None:
+        current_user.full_name = data.full_name
+    if data.role is not None and data.role in allowed_roles:
+        current_user.role = data.role
+    await db.commit()
+    await db.refresh(current_user)
     return current_user

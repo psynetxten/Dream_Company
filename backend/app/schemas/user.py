@@ -30,6 +30,11 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

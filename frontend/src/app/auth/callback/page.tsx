@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getApiBaseUrl } from "@/lib/api";
+import { getUserRole, setRoleCookie, roleToHome } from "@/lib/auth";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -23,18 +23,9 @@ export default function AuthCallbackPage() {
 
         if (!session) throw new Error("세션을 가져올 수 없습니다.");
 
-        // 기존 주문 있으면 홈, 없으면 온보딩
-        const ordersRes = await fetch(`${getApiBaseUrl()}/api/v1/orders`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-
-        if (ordersRes.ok) {
-          const data = await ordersRes.json();
-          const hasOrders = Array.isArray(data) ? data.length > 0 : (data.data?.length ?? 0) > 0;
-          router.replace(hasOrders ? "/" : "/onboarding");
-        } else {
-          router.replace("/onboarding");
-        }
+        const role = await getUserRole();
+        setRoleCookie(role);
+        router.replace(roleToHome(role));
       } catch (err: unknown) {
         setMessage(err instanceof Error ? err.message : "인증에 실패했습니다.");
         setStatus("error");
