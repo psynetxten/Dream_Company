@@ -168,14 +168,15 @@ function LoginForm() {
           <div className="space-y-3">
             <button
               type="button"
-              disabled
-              className="w-full font-bold text-base rounded-2xl py-4 flex items-center justify-center gap-2 opacity-40 cursor-not-allowed"
+              onClick={() => handleOAuth("kakao")}
+              disabled={!!oauthLoading}
+              className="w-full font-bold text-base rounded-2xl py-4 flex items-center justify-center gap-2 disabled:opacity-50"
               style={{ minHeight: 52, background: "#FEE500", color: "#191919" }}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 3C6.477 3 2 6.477 2 10.75c0 2.763 1.847 5.19 4.621 6.498L5.43 21.64c-.067.248.167.46.388.312l4.985-3.324c.394.04.795.062 1.197.062 5.523 0 10-3.477 10-7.75C22 6.477 17.523 3 12 3z" />
               </svg>
-              카카오 로그인 준비 중
+              {oauthLoading === "kakao" ? "연결 중..." : "카카오로 계속하기"}
             </button>
 
             <button

@@ -45,23 +45,31 @@ async def get_current_user(
         raise_unauthorized(f"Auth error: {str(e)}")
 
     supabase_user = user_res.user
-    email = supabase_user.email
-    user_id = supabase_user.id
+    user_id = uuid.UUID(supabase_user.id)
+    email = supabase_user.email  # 카카오 로그인 시 None일 수 있음
     metadata = supabase_user.user_metadata or {}
 
-    # DB에 해당 유저가 있는지 확인
-    result = await db.execute(select(User).where(User.email == email))
+    # Supabase UUID로 조회 (이메일 없는 카카오 유저 지원)
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user:
-        full_name = metadata.get("full_name") or metadata.get("name") or metadata.get("nickname") or "꿈 참여자"
+        full_name = (
+            metadata.get("full_name")
+            or metadata.get("name")
+            or metadata.get("nickname")
+            or "꿈 참여자"
+        )
+        provider = supabase_user.app_metadata.get("provider", "email") if supabase_user.app_metadata else "email"
         user = User(
-            id=uuid.UUID(user_id),
+            id=user_id,
             email=email,
             full_name=full_name,
             role="user",
+            oauth_provider=provider if provider != "email" else None,
+            oauth_provider_id=supabase_user.id,
             is_active=True,
-            is_verified=True
+            is_verified=True,
         )
         db.add(user)
         await db.commit()

@@ -18,7 +18,7 @@ class UserLogin(BaseModel):
 
 class UserResponse(BaseModel):
     id: uuid.UUID
-    email: str
+    email: Optional[str] = None
     full_name: str
     role: str
     is_active: bool
