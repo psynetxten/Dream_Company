@@ -84,33 +84,15 @@ async def ping():
 # ============================
 @app.get("/health")
 async def health_check():
-    import datetime
-    import traceback
-    result = {"version": "0.1.3-diag", "deployed_at": str(datetime.datetime.now())}
-    # 1. raw engine 연결 테스트
     try:
-        from app.database import engine
-        from sqlalchemy import text
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        result["db_raw"] = "ok"
-    except Exception as e:
-        result["db_raw"] = f"error: {e}"
-        result["db_raw_tb"] = traceback.format_exc()[-500:]
-    # 2. AsyncSession ORM 테스트
-    try:
-        from app.database import get_db
+        from app.database import _get_session_factory
         from app.models.user import User
         from sqlalchemy import select, func
-        from app.database import _get_session_factory
         async with _get_session_factory()() as session:
-            cnt = await session.scalar(select(func.count()).select_from(User))
-        result["db_orm"] = f"ok, users={cnt}"
+            await session.scalar(select(func.count()).select_from(User))
+        return {"status": "ok"}
     except Exception as e:
-        result["db_orm"] = f"error: {e}"
-        result["db_orm_tb"] = traceback.format_exc()[-800:]
-    result["status"] = "ok" if "error" not in result.get("db_raw","") and "error" not in result.get("db_orm","") else "degraded"
-    return result
+        return {"status": "degraded", "error": str(e)}
 
 
 @app.get("/")

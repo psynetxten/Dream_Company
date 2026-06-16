@@ -3,7 +3,7 @@ import { CapacitorConfig } from "@capacitor/cli";
 // 앱이 로드할 URL
 // - 프로덕션: 배포된 웹앱 URL (server.url 설정)
 // - 로컬 개발: webDir 사용 (server.url 제거)
-const PRODUCTION_URL = "https://app.dreamnewspaper.com";
+const PRODUCTION_URL = "https://dreamnewspaper.com";
 
 const config: CapacitorConfig = {
   appId: "com.dreamnewspaper.app",

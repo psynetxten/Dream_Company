@@ -514,12 +514,78 @@
 - `/health`: `status: ok, db_connection: ok` ✅
 - 이메일 로그인 / 구글 OAuth / Magic Link 모두 정상 작동
 
+## ✅ 완료 (2026-06-15) — 카카오 로그인 E2E + 역할별 리다이렉트 + 온보딩 모달
+
+### 완료된 작업
+
+1. **카카오 로그인 E2E 완전 동작**
+   - KOE205 에러 원인: 동의항목 미설정 (account_email, profile_image 선택 동의 필요)
+   - Redirect URI 위치: 카카오 Developer → 앱 > 플랫폼 키 > REST API 키 섹션 (일반 탭 아님)
+   - 설정 완료 후 카카오 로그인 정상 작동
+
+2. **로그인 후 역할별 자동 리다이렉트**
+   - `frontend/src/app/auth/callback/page.tsx` — `/auth/callback`에서 역할 감지 → 대시보드 이동
+   - `frontend/src/lib/auth.ts` — `roleToHome()`: user→`/dashboard`, writer→`/writer/dashboard`, sponsor→`/sponsor/dashboard`
+   - 이전: 로그인 후 랜딩페이지(`/`)로 이동 → 수정: 역할 대시보드로 직행
+
+3. **온보딩 페이지 리다이렉트 제거**
+   - `/register/page.tsx`: `"/onboarding"` 하드코딩 인자 제거
+   - `/auth/callback/page.tsx`: `/onboarding` 경유 없이 바로 대시보드 이동
+   - 온보딩 페이지는 레거시로만 존재, 신규 유저는 모달로 처리
+
+4. **신규 유저 설정 모달 (Setup Modal)**
+   - 카카오/매직링크 로그인 신규 유저는 이름이 "꿈 참여자"(기본값)로 설정됨
+   - `/dashboard` 진입 시 이름 미설정 감지 → 이름 입력 + 역할 선택 모달 자동 표시
+   - 저장 완료 → `PATCH /auth/me` → 역할에 맞는 대시보드로 이동
+   - `frontend/src/app/(dashboard)/dashboard/page.tsx`에 `SetupModal` 컴포넌트 구현
+
+5. **백엔드 PATCH /auth/me 엔드포인트 추가**
+   - `backend/app/api/v1/auth.py` — 이름/역할 업데이트 API
+   - `backend/app/schemas/user.py` — `UserProfileUpdate` 스키마 추가
+   - GitHub push → Render 자동 배포 완료
+
+6. **GitHub → Render 자동 배포 확인**
+   - `psynetxten/Dream_Company` main 브랜치 push → Render 백엔드 자동 재빌드
+   - 프론트엔드: Vercel (dreamnewspaper.com)
+   - 백엔드: Render (GitHub 연동 자동 배포)
+
+### 남은 확인 필요 사항
+- [ ] 실제 신규 카카오 유저로 Setup Modal 동작 테스트
+
+---
+
+## ✅ 완료 (2026-06-16) — 프로덕션 API 연결 + JWT 로컬 검증
+
+1. **SUPABASE_JWT_SECRET 로컬 JWT 검증 활성화**
+   - `backend/app/api/v1/auth.py` — python-jose로 로컬 검증 (네트워크 호출 없음, 수 밀리초)
+   - SUPABASE_JWT_SECRET 미설정 시 run_in_executor 폴백 유지
+   - 검증: `/auth/me` invalid token → `"Invalid token"` 응답 ✅
+   - Render 환경변수 추가 완료 (CEO 직접)
+
+2. **dreamnewspaper.com → Vercel 커스텀 도메인 이미 연결되어 있었음**
+   - HTTP 200 정상 응답 확인 ✅
+
+3. **NEXT_PUBLIC_API_URL 수정** (핵심 버그)
+   - 기존: 빈 값 → `localhost:3003` 호출 → 프로덕션에서 API 전혀 안 됨
+   - 수정: `https://dream-newspaper-backend.onrender.com`
+   - Vercel 재배포 완료 (30페이지 전체 빌드 성공) ✅
+
+### 현재 프로덕션 상태
+| 서비스 | URL | 상태 |
+|--------|-----|------|
+| 프론트엔드 | https://dreamnewspaper.com | ✅ LIVE |
+| 백엔드 | https://dream-newspaper-backend.onrender.com | ✅ LIVE |
+| JWT 검증 | 로컬 (python-jose) | ✅ 빠름 |
+| 이메일 발신 | noreply@dreamnewspaper.com (Resend) | ✅ 인증 완료 |
+
+---
+
 ## 다음 할 일
 
 ### 즉시 가능
-- [ ] dreamnewspaper.com → Vercel 커스텀 도메인 연결 (현재 dream-newspaper-phi.vercel.app)
 - [ ] RESEND_API_KEY → Render 환경변수 추가 (이메일 알림 기능 붙일 때)
-- [ ] capacitor.config.ts PRODUCTION_URL → 실제 Vercel URL로 업데이트
+- [ ] capacitor.config.ts PRODUCTION_URL → https://dreamnewspaper.com 로 업데이트
+- [ ] 실제 신규 카카오 유저로 Setup Modal 동작 테스트
 
 ### iOS (즉시 시작 가능)
 - [ ] Apple Developer Program 등록 ($99/년) — `docs/ios-deploy/SETUP.md` 참고
