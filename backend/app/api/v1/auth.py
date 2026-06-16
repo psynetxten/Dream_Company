@@ -37,8 +37,9 @@ async def get_current_user(
     metadata: dict
     app_meta: dict
 
+    local_verified = False
     if settings.SUPABASE_JWT_SECRET:
-        # 로컬 JWT 검증: 네트워크 호출 없이 수 밀리초
+        # 로컬 JWT 검증 시도: 네트워크 호출 없이 수 밀리초
         try:
             payload = jose_jwt.decode(
                 token,
@@ -50,11 +51,12 @@ async def get_current_user(
             email = payload.get("email")
             metadata = payload.get("user_metadata") or {}
             app_meta = payload.get("app_metadata") or {}
+            local_verified = True
         except JWTError as e:
-            log.error("jwt_local_decode_failed", error=str(e), token_preview=token[:10] + "...")
-            raise_unauthorized("Invalid token")
-    else:
-        # 폴백: Supabase 네트워크 호출 (SUPABASE_JWT_SECRET 미설정 시)
+            log.warning("jwt_local_decode_failed_fallback", error=str(e), token_preview=token[:10] + "...")
+
+    if not local_verified:
+        # 폴백: Supabase 네트워크 호출 (로컬 검증 실패 또는 시크릿 미설정 시)
         try:
             loop = asyncio.get_event_loop()
             user_res = await loop.run_in_executor(None, partial(supabase.auth.get_user, token))
