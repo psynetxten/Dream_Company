@@ -580,12 +580,31 @@
 
 ---
 
+## ✅ 완료 (2026-06-16) — 프로덕션 DB 전체 마이그레이션
+
+### 문제
+`/api/v1/stats` 등 모든 DB 의존 엔드포인트 500 에러 — `sponsors` 테이블 없음
+
+### 원인
+프로덕션 Supabase DB에 Alembic 마이그레이션이 전혀 적용 안 된 상태. `users`, `orders`, `newspapers`, `vector_items`만 컬럼도 적게 존재.
+
+### 수정 (Supabase MCP로 직접 SQL 실행)
+- **누락 테이블 8개 생성**: `sponsors`, `sponsor_slots`, `writer_profiles`, `publication_schedules`, `agent_logs`, `notifications`, `refresh_tokens`, `credit_transactions`
+- **템플릿 테이블 4개 생성**: `template_series`, `template_episodes`, `template_slots`, `template_purchases`
+- **`users` 누락 컬럼 추가**: `role`, `password_hash`, `is_verified`, `oauth_provider`, `oauth_provider_id`, `organization_id`, `credits`, `subscription_plan`, `subscription_expires_at`, `updated_at`; email nullable 수정
+- **`orders` 누락 컬럼 추가**: `supporting_people`, `series_theme`, `future_year`, `payment_type`, `payment_status`, `amount_krw`, `merchant_uid`, `imp_uid`, `payment_method`, `stripe_session_id`, `stripe_payment_intent_id`, `assigned_writer_id`, `writer_type`, `publish_time`, `timezone`, `updated_at`, `starts_at`, `ends_at`
+- **`newspapers` 누락 컬럼 추가**: `future_date`, `subhead`, `lead_paragraph`, `sidebar_content`, `variables_used`, `status`, `scheduled_at`, `sns_copy`, `visual_prompt` 등 15개
+- **진단 코드 제거**: `stats.py`, `main.py` 디버그 블록 정리
+- **검증**: `SELECT COUNT(*) FROM sponsors` → 정상 ✅; 전체 16개 테이블 존재 확인 ✅
+- **배포**: `psynetxten/Dream_Company` main 푸시 → Render 자동 배포 중
+
+---
+
 ## 다음 할 일
 
 ### 즉시 가능
 - [ ] RESEND_API_KEY → Render 환경변수 추가 (이메일 알림 기능 붙일 때)
-- [ ] capacitor.config.ts PRODUCTION_URL → https://dreamnewspaper.com 로 업데이트
-- [ ] 실제 신규 카카오 유저로 Setup Modal 동작 테스트
+- [ ] 실제 신규 카카오 유저로 Setup Modal 동작 테스트 (https://dreamnewspaper.com)
 
 ### iOS (즉시 시작 가능)
 - [ ] Apple Developer Program 등록 ($99/년) — `docs/ios-deploy/SETUP.md` 참고
