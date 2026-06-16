@@ -58,7 +58,7 @@ async def get_current_user(
     if not local_verified:
         # 폴백: Supabase 네트워크 호출 (로컬 검증 실패 또는 시크릿 미설정 시)
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             user_res = await loop.run_in_executor(None, partial(supabase.auth.get_user, token))
             if not user_res or not user_res.user:
                 log.error("auth_failed", token_preview=token[:10] + "...")
