@@ -14,6 +14,7 @@ from app.core.exceptions import raise_conflict, raise_unauthorized
 from app.config import settings
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.supabase_client import supabase, get_supabase_admin
+from jose import jwt as jose_jwt, JWTError
 import structlog
 
 log = structlog.get_logger()
@@ -28,26 +29,49 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Supabase JWT 검증 — run_in_executor로 블로킹 호출을 스레드풀에서 실행 (Render 503 방지)"""
+    """Supabase JWT 검증 — SUPABASE_JWT_SECRET 있으면 로컬 검증(빠름), 없으면 run_in_executor 폴백"""
     token = credentials.credentials
 
-    try:
-        # 동기 Supabase 호출을 스레드풀에서 실행해 이벤트루프 블로킹 방지
-        loop = asyncio.get_event_loop()
-        user_res = await loop.run_in_executor(None, partial(supabase.auth.get_user, token))
-        if not user_res or not user_res.user:
-            log.error("auth_failed", token_preview=token[:10] + "...")
-            raise_unauthorized("Invalid session or user not found")
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
-        log.error("auth_exception", error=str(e), token_preview=token[:10] + "...")
-        raise_unauthorized(f"Auth error: {str(e)}")
+    user_id: uuid.UUID
+    email: str | None
+    metadata: dict
+    app_meta: dict
 
-    supabase_user = user_res.user
-    user_id = uuid.UUID(supabase_user.id)
-    email = supabase_user.email  # 카카오 로그인 시 None일 수 있음
-    metadata = supabase_user.user_metadata or {}
+    if settings.SUPABASE_JWT_SECRET:
+        # 로컬 JWT 검증: 네트워크 호출 없이 수 밀리초
+        try:
+            payload = jose_jwt.decode(
+                token,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+            user_id = uuid.UUID(payload["sub"])
+            email = payload.get("email")
+            metadata = payload.get("user_metadata") or {}
+            app_meta = payload.get("app_metadata") or {}
+        except JWTError as e:
+            log.error("jwt_local_decode_failed", error=str(e), token_preview=token[:10] + "...")
+            raise_unauthorized("Invalid token")
+    else:
+        # 폴백: Supabase 네트워크 호출 (SUPABASE_JWT_SECRET 미설정 시)
+        try:
+            loop = asyncio.get_event_loop()
+            user_res = await loop.run_in_executor(None, partial(supabase.auth.get_user, token))
+            if not user_res or not user_res.user:
+                log.error("auth_failed", token_preview=token[:10] + "...")
+                raise_unauthorized("Invalid session or user not found")
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
+            log.error("auth_exception", error=str(e), token_preview=token[:10] + "...")
+            raise_unauthorized(f"Auth error: {str(e)}")
+
+        supabase_user = user_res.user
+        user_id = uuid.UUID(supabase_user.id)
+        email = supabase_user.email  # 카카오 로그인 시 None일 수 있음
+        metadata = supabase_user.user_metadata or {}
+        app_meta = supabase_user.app_metadata or {}
 
     # Supabase UUID로 조회 (이메일 없는 카카오 유저 지원)
     result = await db.execute(select(User).where(User.id == user_id))
@@ -60,7 +84,7 @@ async def get_current_user(
             or metadata.get("nickname")
             or "꿈 참여자"
         )
-        provider = supabase_user.app_metadata.get("provider", "email") if supabase_user.app_metadata else "email"
+        provider = app_meta.get("provider", "email")
         user = User(
             id=user_id,
             email=email,
