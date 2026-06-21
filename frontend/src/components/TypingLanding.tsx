@@ -172,13 +172,22 @@ export default function TypingLanding() {
 
             {phase === "sent" && (
               <div style={{ marginTop: "2.5rem", padding: "1.5rem", background: "rgba(201,168,76,0.12)", borderLeft: "4px solid #C9A84C", fontFamily: "system-ui, sans-serif" }}>
-                <p style={{ margin: 0, fontSize: "1rem", color: "#1A2744", fontWeight: 600 }}>초대장을 발송했습니다</p>
+                <p style={{ margin: 0, fontSize: "1rem", color: "#1A2744", fontWeight: 600 }}>링크를 발송했습니다</p>
                 <p style={{ margin: "0.5rem 0 0", fontSize: "0.875rem", color: "#555", lineHeight: 1.6 }}>
-                  <strong>{email}</strong>로 링크를 보냈습니다.<br />
+                  <strong>{email}</strong>로 로그인 링크를 보냈습니다.<br />
                   링크를 클릭하면 {name}씨의 신문이 시작됩니다.
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 재방문 유저 — 항상 표시 */}
+        {phase !== "masthead" && phase !== "sent" && (
+          <div style={{ marginTop: "3rem", textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
+            <a href="/login" style={{ fontSize: "0.8rem", color: "#888", textDecoration: "none", borderBottom: "1px solid #ccc", paddingBottom: "1px" }}>
+              이미 구독 중이에요 →
+            </a>
           </div>
         )}
       </div>
