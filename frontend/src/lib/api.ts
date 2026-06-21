@@ -50,8 +50,12 @@ api.interceptors.response.use(
     }
     if (error.response?.status === 401) {
       await supabase.auth.signOut();
-      // 이미 /login이면 리다이렉트하지 않음 (무한루프 방지)
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      document.cookie = "dream_role=; path=/; max-age=0";
+      localStorage.removeItem("dream_portal_role");
+      // 보호 경로에서만 /login으로 이동 — 공개 페이지(/)에서는 PortalProvider가 처리
+      const AUTH_REQUIRED = ["/dashboard", "/order", "/writer", "/sponsor"];
+      const isProtected = AUTH_REQUIRED.some((p) => window.location.pathname.startsWith(p));
+      if (typeof window !== "undefined" && isProtected) {
         window.location.href = "/login";
       }
     }

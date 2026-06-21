@@ -13,12 +13,25 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
 
   // 페이지 로드 시 백엔드 워밍업 (Render 콜드 스타트 방지)
   useEffect(() => {
     fetch(`${getApiBaseUrl()}/api/ping`).catch(() => {});
   }, []);
+
+  // Kakao/Google OAuth 후 세션이 이미 있으면 바로 이동
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const role = await getUserRole();
+        setRoleCookie(role);
+        const nextPath = searchParams.get("next");
+        router.replace(nextPath || roleToHome(role));
+      }
+    });
+  }, [router, searchParams]);
 
   const handleOAuth = async (provider: "kakao" | "google") => {
     setOauthLoading(provider);
@@ -39,45 +52,22 @@ function LoginForm() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) return;
     setLoading(true);
     setError("");
-
     try {
-      const response = await fetch(
-        `${getApiBaseUrl()}/api/v1/auth/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: form.email, password: form.password }),
-        }
-      );
-
-      const result = await response.json();
-      if (!response.ok) {
-        const detail = result.detail;
-        const msg = typeof detail === "string" ? detail : "이메일 또는 비밀번호가 올바르지 않습니다.";
-        throw new Error(msg);
-      }
-
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-      if (sessionError) throw sessionError;
-
-      const role = await getUserRole();
-      setRoleCookie(role);
-
-      const nextPath = searchParams.get("next");
-      router.push(nextPath || roleToHome(role));
+      if (error) throw error;
+      setSent(true);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "로그인에 실패했습니다.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "링크 발송에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -110,52 +100,62 @@ function LoginForm() {
             </h1>
           </div>
 
-          {/* 폼 */}
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="이메일"
-              required
-              className="app-input"
-            />
-            <input
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="비밀번호"
-              required
-              className="app-input"
-            />
-
-            {error && (
-              <p className="text-sm text-[#CC2200] px-1">{error}</p>
-            )}
-
-            <div className="pt-1">
+          {sent ? (
+            /* 발송 완료 상태 */
+            <div className="p-5 bg-[rgba(201,168,76,0.12)] border-l-4 border-[#C9A84C] rounded-r-lg space-y-2">
+              <p className="font-bold text-[#1A1A1A]">링크를 발송했습니다</p>
+              <p className="text-sm text-[#6B6869] leading-relaxed">
+                <strong>{email}</strong>로 로그인 링크를 보냈습니다.<br />
+                링크를 클릭하면 바로 입장됩니다.
+              </p>
               <button
-                type="submit"
-                disabled={loading}
-                className="app-btn-primary disabled:opacity-50"
+                className="text-sm text-[#AEAAA5] underline mt-2"
+                onClick={() => setSent(false)}
               >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                    </svg>
-                    로그인 중
-                  </span>
-                ) : (
-                  "로그인"
-                )}
+                다른 이메일로 다시 보내기
               </button>
             </div>
-          </form>
+          ) : (
+            /* Magic Link 폼 */
+            <form onSubmit={handleMagicLink} className="space-y-3">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="이메일"
+                required
+                autoFocus
+                className="app-input"
+              />
+
+              {error && (
+                <p className="text-sm text-[#CC2200] px-1">{error}</p>
+              )}
+
+              <div className="pt-1">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="app-btn-primary disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                      </svg>
+                      발송 중
+                    </span>
+                  ) : (
+                    "로그인 링크 받기"
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
-        {/* 하단: 소셜 로그인 + 회원가입 */}
+        {/* 하단: 소셜 로그인 + 처음 방문 */}
         <div>
           {/* 구분선 */}
           <div className="flex items-center gap-3 mb-4">
@@ -197,9 +197,9 @@ function LoginForm() {
 
           {/* 하단 링크 */}
           <p className="text-center text-sm text-[#6B6869] mt-5">
-            계정이 없으신가요?{" "}
-            <Link href="/register" className="font-bold text-[#1A1A1A] hover:underline">
-              시작하기
+            처음이신가요?{" "}
+            <Link href="/" className="font-bold text-[#1A1A1A] hover:underline">
+              꿈신문 받기 →
             </Link>
           </p>
         </div>
