@@ -82,7 +82,10 @@
   - 백엔드: `require_role`이 보유 집합(roles) 기준 판정 / 작가·스폰서 지원이 역할을 덮어쓰지 않고 **추가** + 활성 전환 / 신규 `PATCH /auth/active-role`(보유 역할로만 전환, 미보유 403) / `/auth/me`에 roles 포함 / register는 roles=["user"].
   - 프론트: `authApi.setActiveRole`, 프로필 페이지에 역할 전환 스위처(2개 이상 보유 시 표시), 작가/스폰서 nav "홈"→"더보기"(/profile)로 변경(프로필·로그아웃·역할전환 접근 + 기존 로그아웃 부재 갭 해소).
   - Docker E2E: 가입→작가→스폰서 누적(roles=[user,writer,sponsor]) / 활성=sponsor인데 writer 보유 시 /writer/me 200 / 활성전환 / 미보유 admin 403 — 전부 통과.
-  - ⏳ 배포: 백엔드(Render, 마이그레이션 포함) → 프론트(Vercel) 순. 프로덕션 스위처 검증 예정.
+  - 🚨 **배포 시 인시던트 발생·복구**: Render DB에 마이그레이션이 적용 안 돼(`column users.roles does not exist`) **프로덕션 인증 전체 장애**(register 400, /auth/me 500). 원인: Dockerfile이 `alembic upgrade head; uvicorn`(실패해도 기동)인데 Render alembic 체인이 어긋나 마이그레이션 미적용. **즉시 백엔드를 직전(b87d2c6)으로 롤백→복구 확인**(/auth/me 200, 작가지원 정상). 멀티-role 코드는 git e87d9c7에 보존.
+  - 프론트(스위처/nav)는 유지 — roles 부재 시 스위처 자동 숨김이라 무해. 작가/스폰서 nav "더보기"(/profile)도 정상.
+  - 교훈 메모리화: [Render 마이그레이션 위험](../../../../.claude/.../project_render_migration_risk.md).
+  - ⏳ **멀티-role 재적용 계획(별도·신중)**: Render alembic 현재 리비전 확인 필요(CEO가 Render Shell `alembic current` 또는 DATABASE_URL 제공) → idempotent DDL(`ADD COLUMN IF NOT EXISTS`)로 컬럼 보장 → 코드 재적용(e87d9c7 cherry-pick) → 프로덕션 인증 E2E 확인.
 - ⏳ **남은 P1(선택)**: Magic Link 인증 완전 통일, 공용 컴포넌트 추출, waitlist, first-value 미리보기.
 
 ---
