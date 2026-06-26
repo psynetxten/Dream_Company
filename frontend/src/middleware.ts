@@ -23,6 +23,10 @@ const ROLE_GUARD: Record<string, string[]> = {
   "/sponsor": ["sponsor", "admin"],
 };
 
+// 가입/온보딩 경로 — 인증만 되면 역할 무관하게 접근 허용
+// (아직 sponsor/writer가 아닌 유저가 해당 역할로 "전환/지원"하는 진입점)
+const ROLE_GUARD_EXEMPT = ["/sponsor/register", "/writer/apply"];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const role = request.cookies.get(ROLE_COOKIE)?.value ?? null;
@@ -38,7 +42,9 @@ export function middleware(request: NextRequest) {
   }
 
   // ── 2. 역할 불일치 → 해당 역할 홈으로 리다이렉트 ──────
+  const isOnboardingPath = ROLE_GUARD_EXEMPT.some((p) => pathname.startsWith(p));
   for (const [prefix, allowed] of Object.entries(ROLE_GUARD)) {
+    if (isOnboardingPath) break; // 가입/온보딩은 역할 가드 면제 (인증은 위에서 이미 확인)
     if (pathname.startsWith(prefix) && !allowed.includes(role ?? "")) {
       const home =
         role === "writer"

@@ -2,6 +2,85 @@
 
 ---
 
+## 🗓️ 회의록 (2026-06-26) — 작가·스폰서 유입 개선 전 직원 회의
+
+**참석:** PM / UX 리서처 / 그로스 / 프론트엔드 (CTO 주재·종합)
+**의제:** 작가·스폰서가 "들어오는 과정"을 더 쉽게 손보기 + 코드 정리
+
+### CTO 코드 분석으로 확인된 현황(사실)
+- **작가:** `/register/writer` 존재하나 구식 email+password + 신문 브루탈리즘 디자인. 폼이 필명/전문분야/자기소개를 받지만 **백엔드로 전송 안 됨 → 버려짐**(`registerAndLogin`은 email/password/name/role만 보냄). 백엔드 `writer.py`에 작가 프로필 생성 엔드포인트 **없음**. 게스트 랜딩에 작가 지원 **발견 경로 없음**.
+- **스폰서:** 등록 페이지 **2개 중복** — `/register/sponsor`(계정+role만 생성 → 등록 후 `/sponsor/me` 404) + `/sponsor/register`(프로필 생성). 둘 다 구식 디자인. 슬롯 "구매" 무료(결제 미연동).
+- **보안(검증완료):** `/auth/register`·`PATCH /auth/me`가 클라이언트 `role`을 `{user,writer,sponsor}` 범위에서 그대로 수용 → **누구나 심사 없이 작가/스폰서 권한 자가획득 가능**(admin 상승은 불가). 작가가 되면 무료 주문 가로채기 가능.
+- **공통:** 디자인 이중화(유저=모바일앱 / 작가·스폰서=데스크탑신문), 인증 이중화(Magic Link vs password), role 단방향·단일(겸직 불가).
+- **브랜드규칙 위반:** 스폰서 페이지에 "AI" 노출(`/register/sponsor`, `/sponsor/register`) → "편집국" 표현으로 교체 필요.
+
+### 4부서 합의 (수렴)
+- **P0-1 [보안]** register/PATCH me에서 클라이언트 role 신뢰 제거 → role은 서버가 결정. *(한 줄 수준, 최우선)*
+- **P0-2 [데이터유실]** 작가 프로필 생성 엔드포인트 신설 + 폼 데이터 백엔드 연결. *(이미 입력받은 데이터가 매일 버려짐)*
+- **P0-3 [중복/404]** 스폰서 등록 페이지 2개 → 1개 통합.
+- **P1 [인증통일]** 작가·스폰서도 Magic Link. 가입(이메일만) ↔ 프로필 수집(가입후 온보딩 스텝) 분리.
+- **P1 [멀티role]** 단방향 전환 폐기 → 한 계정이 독자+작가+스폰서 겸직. *(PM 강력 권고: 비즈니스 모델 정합 — 꿈꾸는 스폰서 담당자가 최고 타깃)*
+- **P1 [디자인통합]** `app-*` 유틸 + 공용 컴포넌트(`StepForm`/`TagInput`/`AuthShell`/`RoleSwitcher`)로 작가·스폰서를 모바일앱 스타일에 흡수.
+- **P1 [발견경로]** 랜딩에 공급측 CTA 2종("기자단 합류"/"우리 브랜드를 미래에") + 작가/스폰서 waitlist. *(그로스 최고 ROI 실험)*
+- **P2 [first value]** 가입 직후 미리보기("N명이 당신 분야를 꿈꿉니다" / 작가 대기 의뢰 카드).
+- **P2 [수익화]** 슬롯 결제 연동 (케이스스터디 확보 후).
+
+### CTO 권장 실행 순서
+1. **P0 3건 즉시**(저위험·고가치): 보안 role 제거 → 작가 데이터 복구 → 스폰서 등록 통합 + "AI" 카피 수정.
+2. **P1 본격 개편**(중간 규모, CEO 승인 후): 멀티role 모델 + Magic Link 통일 + 디자인 시스템 통합 + 랜딩 CTA·waitlist.
+3. **P2 나중**: first value 미리보기, 결제.
+
+### ✅ CEO 결정 (2026-06-26)
+- **(A) role 모델**: 멀티-role 겸직 채택.
+- **(B) 착수 범위**: P0 + P1 본격 개편.
+
+### 진행 현황
+**✅ 완료 — P0-3/P0-4 스폰서 온보딩 수정 (프론트+미들웨어, 백엔드 무관, 검증완료)**
+- 검증 중 **스폰서 가입이 다중으로 깨져 있던 것** 발견·수정:
+  1. `/sponsor/register`가 미들웨어 ROLE_GUARD("/sponsor"=sponsor 전용)에 막혀 일반 유저가 접근 불가(홈으로 튕김) → 가입 불가능 상태였음.
+  2. 등록 성공 후 role 쿠키 미갱신 → 대시보드로 또 튕김.
+  3. 등록 페이지 2개 중복(`/register/sponsor` 비보안 registerAndLogin + `/sponsor/register`).
+  4. "AI 타겟팅" 카피(브랜드 규칙 위반).
+- 수정:
+  - `middleware.ts`: `ROLE_GUARD_EXEMPT=["/sponsor/register","/writer/apply"]` 추가 — 가입/온보딩 경로는 인증만 되면 역할 무관 접근. (다른 /sponsor/* 는 여전히 보호 — 검증함)
+  - `/sponsor/register`: 등록 성공 시 `setRoleCookie("sponsor")` + "AI 타겟팅"→"타겟팅 설정", "AI가 매칭"→"편집국이 맞춤 연결".
+  - `/register/sponsor`(비보안): `/sponsor/register`로 리다이렉트 처리(client-role 전송 경로 폐기).
+  - 랜딩 `page.tsx` 스폰서 등록 링크 → `/sponsor/register`.
+- 검증(로컬 dev): role=user로 /sponsor/register 접근 가능·새 카피 확인, /register/sponsor 리다이렉트 확인, /sponsor/dashboard는 여전히 차단, 콘솔 에러 0.
+
+**⏳ 다음 — P0-1/P0-2 백엔드 보안+작가 엔드포인트 (별도 단위, Docker 검증 필요)**
+- P0-1: `/auth/register`·`PATCH /auth/me`에서 클라이언트 role 신뢰 제거(서버 결정). ⚠️ 단독 배포 시 작가 가입(registerAndLogin("writer")) 깨짐 → P0-2와 함께.
+- P0-2: 작가 지원 엔드포인트(`POST /writer/apply`) 신설 — 필명/전문분야/bio 저장 + role 서버 승격. 프론트 `/register/writer`를 Magic Link로 전환.
+- 백엔드는 Docker 미실행 상태라 로컬 검증하려면 `docker compose up` 필요. render.yaml로 배포.
+
+**⏳ 이후 — P1**: 멀티role DB 모델 + Magic Link 인증 통일 + 디자인시스템 통합(StepForm/TagInput/AuthShell/RoleSwitcher) + 랜딩 공급측 CTA·waitlist.
+
+---
+
+## ✅ 완료 (2026-06-26) — 의뢰 폼 데스크탑 모바일 폭 고정 + 배포
+
+### 문제
+- CEO 피드백: "의뢰할 때 화면이 갑자기 웹(전체 폭)이 됨 — 모바일 사이즈여야 함"
+- 원인: `OrderForm`의 `Screen` 래퍼(`position:fixed; inset:0`)에 `max-width` 제한 없음
+  → 데스크탑에서 폼이 화면 전체 폭으로 퍼짐 (로그인/랜딩은 `max-w-sm`로 제한하는데 OrderForm만 누락)
+
+### 수정
+- `Screen` 안에 `width:100%; maxWidth:430px` 중앙 정렬 래퍼 추가 (Step 1/2/3 공통 적용)
+- 파일: `frontend/src/components/forms/OrderForm.tsx`
+
+### 검증
+- 로컬 dev: 1280px → 래퍼 430px 중앙정렬(left=425), 375px → full-width(375px), 콘솔 에러 0
+- 프로덕션: dreamnewspaper.com SSR HTML에 `max-width:430px` 포함 확인 ✅
+
+### 배포
+- 커밋 `81a0b05` → `psynetxten/Dream_Company` main 푸시
+- ⚠️ **주의**: Vercel은 `psynetxten` git push로 자동 배포 안 됨 (구 repo `powergild/DreamNews`에 연결)
+  → `frontend/` 디렉토리에서 `vercel deploy --prod`로 **수동 배포** 필요
+  → 루트에서 배포하면 루트 `vercel.json`의 `@backend_url` 시크릿 미존재로 실패함
+- 배포: `dpl_EyKtug1uzRyiWpQSPhhNJZR8dP1x` → **READY** → dreamnewspaper.com 별칭 연결 ✅
+
+---
+
 ## ✅ 완료 (2026-06-21) — 전체 E2E 플로우 테스트 완료 (게스트→로그인→주문→신문뷰어)
 
 ### E2E 전체 플로우 PASS (dreamnewspaper.com 실 브라우저)

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sponsorApi, SponsorCreate } from "@/lib/api";
+import { setRoleCookie } from "@/lib/auth";
 
 const INDUSTRIES = [
   "IT/소프트웨어", "금융/핀테크", "의료/바이오", "교육", "제조/엔지니어링",
@@ -46,6 +47,8 @@ export default function SponsorRegisterPage() {
     setError("");
     try {
       await sponsorApi.register(form);
+      // 등록 성공 → 백엔드가 role을 sponsor로 승격. 쿠키도 갱신해야 가드 통과.
+      setRoleCookie("sponsor");
       router.push("/sponsor/dashboard");
     } catch (err: any) {
       setError(err.response?.data?.detail || "등록 중 오류가 발생했습니다.");
@@ -117,10 +120,10 @@ export default function SponsorRegisterPage() {
           </div>
         </section>
 
-        {/* AI 타겟팅 설정 */}
+        {/* 타겟팅 설정 */}
         <section className="border-2 border-ink p-6">
-          <h2 className="font-headline text-xl font-bold mb-2 border-b border-ink pb-2">AI 타겟팅 설정</h2>
-          <p className="text-xs text-ink-muted italic mb-4">아래 정보를 바탕으로 AI가 관련 꿈을 가진 독자에게 자동 매칭합니다.</p>
+          <h2 className="font-headline text-xl font-bold mb-2 border-b border-ink pb-2">타겟팅 설정</h2>
+          <p className="text-xs text-ink-muted italic mb-4">아래 정보를 바탕으로 편집국이 관련 꿈을 가진 독자에게 맞춤 연결합니다.</p>
 
           <div className="space-y-4">
             {/* 타겟 직업군 */}

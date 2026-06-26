@@ -405,7 +405,7 @@ function SponsorHome() {
           <p className="app-section-label mb-3">시작하기</p>
           <div className="space-y-2">
             {[
-              { step: 1, label: "스폰서 등록", href: "/register/sponsor", desc: "기업 정보 등록" },
+              { step: 1, label: "스폰서 등록", href: "/sponsor/register", desc: "기업 정보 등록" },
               { step: 2, label: "슬롯 구매", href: "/sponsor/slots", desc: "기사 삽입 슬롯 선택" },
               { step: 3, label: "결과 확인", href: "/sponsor/dashboard", desc: "노출 현황 분석" },
             ].map((item) => (
