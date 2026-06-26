@@ -87,11 +87,20 @@ export default function OrderForm() {
       inset: 0,
       background: "#F4F3EE",
       display: "flex",
-      flexDirection: "column",
+      justifyContent: "center",
       overflow: "hidden",
       zIndex: 10,
     }}>
-      {children}
+      <div style={{
+        width: "100%",
+        maxWidth: 430,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}>
+        {children}
+      </div>
     </div>
   );
 

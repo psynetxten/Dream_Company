@@ -2,6 +2,62 @@
 
 ---
 
+## ✅ 완료 (2026-06-21) — 전체 E2E 플로우 테스트 완료 (게스트→로그인→주문→신문뷰어)
+
+### E2E 전체 플로우 PASS (dreamnewspaper.com 실 브라우저)
+
+| 단계 | 결과 |
+|------|------|
+| Magic Link 클릭 → `/auth/callback` → `/dashboard` 리다이렉트 | ✅ |
+| `/dashboard` 빈 상태 렌더링 | ✅ |
+| `/order/new` Step 1: 꿈 입력 | ✅ |
+| `/order/new` Step 2: 주인공·역할·회사·연도 입력 | ✅ |
+| `/order/new` Step 3: 무료 시작 → 주문 생성 | ✅ |
+| `/order/generating` LIVE 스트리밍 로그 | ✅ |
+| `/newspapers/{id}` 신문 뷰어 완전 렌더링 | ✅ |
+| 스폰서 자동 매칭 (AI 꿈 → GOOGLE) | ✅ |
+| 미래 날짜 (2030년), 1인칭 현재진행형 문체 | ✅ |
+
+**생성된 신문**: `b799f876-ad99-4050-a81b-fdf2cbd48320`
+**헤드라인**: "이준호, 카카오 AI팀 수석 엔지니어 등극"
+**스폰서**: GOOGLE (자동 매칭)
+
+---
+
+## ✅ 완료 (2026-06-21) — 인증 플로우 E2E 테스트 + 버그 수정 4건
+
+### 발견 및 수정한 버그
+
+| # | 버그 | 수정 내용 |
+|---|------|----------|
+| 1 | `/login` "시작하기" → `/register` → `/login` 무한루프 | "꿈신문 받기 →" 링크 → `/` (TypingLanding)으로 변경 |
+| 2 | `/` 게스트 방문 시 `/login`으로 리다이렉트 | `api.ts` 401 인터셉터 → 보호 경로에서만 리다이렉트 (공개 페이지 제외) |
+| 3 | `/login` 이메일+비밀번호 폼 — Magic Link 가입자 로그인 불가 | Magic Link OTP 폼으로 완전 교체 |
+| 4 | `GuestOnboarding` 데드코드 — `/register` 링크 포함 | 컴포넌트 제거 |
+
+### E2E 테스트 검증 결과 (dreamnewspaper.com 직접 브라우저 테스트)
+
+| 단계 | 결과 |
+|------|------|
+| `/` 게스트 → TypingLanding 표시 (리다이렉트 없음) | ✅ |
+| 이름 입력 → Enter → suffix 타이핑 애니메이션 | ✅ |
+| 이메일 입력 → "꿈신문 받기" → Magic Link 발송 | ✅ |
+| `/login` Magic Link OTP 폼 | ✅ |
+| `/login` "꿈신문 받기 →" → `/` (루프 없음) | ✅ |
+| TypingLanding "이미 구독 중이에요 →" → `/login` | ✅ |
+
+### 배포
+- 커밋: `ad53a71` → `psynetxten/Dream_Company` main
+- Vercel 배포: `dpl_HQ9wEESmYS6eZHexT6zCnMTfRn7u` → **READY** ✅
+- dreamnewspaper.com 실시간 반영 완료
+
+### 다음 할 일
+- Magic Link 클릭 → `/auth/callback` → 대시보드 이동 검증 (CEO가 받은 이메일 링크 클릭으로 확인 가능)
+- `/order/new` 의뢰 생성 → 신문 뷰어 플로우 추가 테스트
+- RESEND_API_KEY Render 환경변수 추가 → 커스텀 이메일 발신자명 설정
+
+---
+
 ## ✅ 완료 (2026-06-14) — 로그인 플로우 수정 + /auth/me 503 근본 원인 수정
 
 ### 진단 결과
