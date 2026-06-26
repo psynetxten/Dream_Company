@@ -3,19 +3,45 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { signOut } from "@/lib/auth";
+import { signOut, setRoleCookie, roleToHome } from "@/lib/auth";
+import { authApi } from "@/lib/api";
 import AppBar from "@/components/AppBar";
+
+const ROLE_LABEL: Record<string, string> = {
+  user: "독자",
+  writer: "기자단",
+  sponsor: "스폰서",
+  admin: "관리자",
+};
 
 export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [activeRole, setActiveRole] = useState<string>("");
+  const [roles, setRoles] = useState<string[]>([]);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setEmail(data.user?.email || "");
       setName(data.user?.user_metadata?.full_name || "");
     });
+    authApi.me()
+      .then((r) => { setActiveRole(r.data?.role || ""); setRoles(r.data?.roles || []); })
+      .catch(() => {});
   }, []);
+
+  const handleSwitch = async (role: string) => {
+    if (role === activeRole || switching) return;
+    setSwitching(true);
+    try {
+      await authApi.setActiveRole(role);
+      setRoleCookie(role);
+      window.location.href = roleToHome(role);
+    } catch {
+      setSwitching(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F4F3EE]">
@@ -33,6 +59,34 @@ export default function ProfilePage() {
             <p className="text-sm text-[#6B6869] truncate">{email}</p>
           </div>
         </div>
+
+        {/* 역할 전환 — 2개 이상 보유 시만 표시 */}
+        {roles.length > 1 && (
+          <div className="app-card p-4">
+            <p className="app-section-label mb-3">역할 전환</p>
+            <div className="flex flex-wrap gap-2">
+              {roles.map((r) => {
+                const on = r === activeRole;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => handleSwitch(r)}
+                    disabled={switching}
+                    className={`px-4 py-2 rounded-full text-sm font-bold border transition-colors disabled:opacity-50 ${
+                      on
+                        ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                        : "bg-white text-[#6B6869] border-[#E0DFD8] active:bg-[#F2F1EB]"
+                    }`}
+                  >
+                    {ROLE_LABEL[r] || r}{on && " · 현재"}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-[#AEAAA5] mt-2.5">선택한 역할의 화면으로 이동합니다.</p>
+          </div>
+        )}
 
         {/* 내 콘텐츠 */}
         <div className="app-card divide-y divide-[#F4F3EE] p-0 overflow-hidden">

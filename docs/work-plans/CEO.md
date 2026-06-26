@@ -77,7 +77,13 @@
 - ✅ **랜딩 공급측 CTA**: TypingLanding 하단에 "기자단 지원 · 스폰서 문의" discreet 링크 추가 → /writer/apply, /sponsor/register. (이전엔 공개 사이트에 공급측 발견 경로 전무) — 배포·검증 완료.
 - ✅ **스폰서 등록 페이지 디자인 통합**: 구식 브루탈리즘 → 모바일 앱 스타일(app-*, F4F3EE, max-w-md, 둥근 입력/태그칩, 하단 네비) 재작성. 세션 가드 추가(미로그인→/login?next 보존). 기능(필드·태그·register·setRoleCookie) 전부 보존. — 검증 완료(세션 주입 렌더, 콘솔 0), 배포 진행.
   - 이로써 작가(/writer/apply)·스폰서(/sponsor/register) 온보딩 모두 유저 플로우와 동일 디자인 언어로 통일됨.
-- ⏳ **남은 P1**: 멀티-role DB 모델(겸직, 가장 큰 작업) + Magic Link 인증 완전 통일 + 공용 컴포넌트 추출(StepForm/TagInput/AuthShell/RoleSwitcher) + waitlist.
+- ✅ **멀티-role DB 모델 (겸직)** — Docker E2E 검증 완료:
+  - DB: `users.roles` 배열 컬럼 추가(마이그레이션 `d4e5f6a7b8c9`), 기존 유저 `[role]`로 backfill. `users.role`은 활성(active) role로 유지(라우팅 기계 무변경 = 저위험).
+  - 백엔드: `require_role`이 보유 집합(roles) 기준 판정 / 작가·스폰서 지원이 역할을 덮어쓰지 않고 **추가** + 활성 전환 / 신규 `PATCH /auth/active-role`(보유 역할로만 전환, 미보유 403) / `/auth/me`에 roles 포함 / register는 roles=["user"].
+  - 프론트: `authApi.setActiveRole`, 프로필 페이지에 역할 전환 스위처(2개 이상 보유 시 표시), 작가/스폰서 nav "홈"→"더보기"(/profile)로 변경(프로필·로그아웃·역할전환 접근 + 기존 로그아웃 부재 갭 해소).
+  - Docker E2E: 가입→작가→스폰서 누적(roles=[user,writer,sponsor]) / 활성=sponsor인데 writer 보유 시 /writer/me 200 / 활성전환 / 미보유 admin 403 — 전부 통과.
+  - ⏳ 배포: 백엔드(Render, 마이그레이션 포함) → 프론트(Vercel) 순. 프로덕션 스위처 검증 예정.
+- ⏳ **남은 P1(선택)**: Magic Link 인증 완전 통일, 공용 컴포넌트 추출, waitlist, first-value 미리보기.
 
 ---
 

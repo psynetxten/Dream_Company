@@ -155,13 +155,13 @@ const USER_TABS: Tab[] = [
 const WRITER_TABS: Tab[] = [
   { href: "/writer/dashboard", label: "집무실", icon: (f) => <IconPencil filled={f} /> },
   { href: "/writer/templates", label: "템플릿", icon: (f) => <IconNewspaper filled={f} /> },
-  { href: "/", label: "홈", icon: (f) => <IconHome filled={f} /> },
+  { href: "/profile", label: "더보기", icon: (f) => <IconPerson filled={f} /> },
 ];
 
 const SPONSOR_TABS: Tab[] = [
   { href: "/sponsor/dashboard", label: "대시보드", icon: (f) => <IconChart filled={f} /> },
   { href: "/sponsor/slots", label: "슬롯", icon: (f) => <IconStar filled={f} /> },
-  { href: "/", label: "홈", icon: (f) => <IconHome filled={f} /> },
+  { href: "/profile", label: "더보기", icon: (f) => <IconPerson filled={f} /> },
 ];
 
 const GUEST_TABS: Tab[] = [

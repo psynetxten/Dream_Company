@@ -75,6 +75,8 @@ export const authApi = {
     api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   updateMe: (data: { full_name?: string; role?: string }) => api.patch("/auth/me", data),
+  /** 활성 role 전환 — 보유한 역할 중 하나로만 가능 */
+  setActiveRole: (role: string) => api.patch("/auth/active-role", { role }),
 };
 
 // 의뢰
