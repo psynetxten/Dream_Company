@@ -8,7 +8,7 @@ from datetime import timedelta, datetime, timezone
 from app.database import get_db
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
-from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse, UserProfileUpdate, ActiveRoleUpdate
+from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse, UserProfileUpdate
 from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_jwt
 from app.core.exceptions import raise_conflict, raise_unauthorized
 from app.config import settings
@@ -108,16 +108,10 @@ async def get_current_user(
 
 
 def require_role(*allowed_roles: str):
-    """특정 role을 '보유한' 유저만 접근 허용하는 FastAPI Depends.
-
-    멀티-role: 활성 role(current_user.role)이 아니라 보유 집합(current_user.roles)을
-    기준으로 판정한다. 예) 스폰서로 활성화돼 있어도 writer 역할을 보유했다면
-    writer 전용 엔드포인트에 접근 가능. (roles가 비어있는 레거시 행은 active role로 폴백)
-    """
+    """특정 role만 접근 허용하는 FastAPI Depends"""
     async def role_checker(current_user: User = Depends(get_current_user)):
-        held = set(current_user.roles or [current_user.role])
-        if held.isdisjoint(allowed_roles):
-            log.warning("role_access_denied", user_id=str(current_user.id), roles=list(held), allowed=allowed_roles)
+        if current_user.role not in allowed_roles:
+            log.warning("role_access_denied", user_id=str(current_user.id), role=current_user.role, allowed=allowed_roles)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operation not permitted for this role"
@@ -162,7 +156,6 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
                 email=str(user_data.email),
                 full_name=user_data.full_name,
                 role=role,
-                roles=[role],  # 멀티-role: 보유 집합에 활성 role 포함
                 is_active=True,
                 is_verified=True
             )
@@ -227,28 +220,4 @@ async def update_me(
         current_user.full_name = data.full_name
     await db.commit()
     await db.refresh(current_user)
-    return current_user
-
-
-@router.patch("/active-role", response_model=UserResponse)
-async def switch_active_role(
-    data: ActiveRoleUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """활성 role 전환 — 보유한 역할(roles) 중 하나로만 가능.
-
-    멀티-role 유저가 독자/작가/스폰서 포털을 오갈 때 사용. 보유하지 않은 역할로는
-    전환 불가(403). 보유 집합 자체는 전용 지원 엔드포인트로만 늘어난다.
-    """
-    held = set(current_user.roles or [current_user.role])
-    if data.role not in held:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"보유하지 않은 역할입니다: {data.role}. 보유 역할: {sorted(held)}",
-        )
-    current_user.role = data.role
-    await db.commit()
-    await db.refresh(current_user)
-    log.info("active_role_switched", user_id=str(current_user.id), role=data.role)
     return current_user
