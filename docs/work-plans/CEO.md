@@ -73,7 +73,11 @@
 - **레이아웃**: `center:true`는 위치가 아니라 스타일만 바꿈 → 게스트는 플로팅이 가운데 아닌 오른쪽에 옴.
 - ✅ **수정 완료** (CEO "알아서 정리" 지시): 가운데 버튼 라벨 하드코딩 제거(`tab.label` 사용), 게스트 탭바를 `홈 | 시작하기(가운데 플로팅, /) | 로그인`으로 재배치(죽은 `/register` 링크 제거, 플로팅 진짜 가운데로), React key를 고유한 `tab.label`로 변경. 작가·스폰서는 현행 3탭 유지. 검증(로컬 dev): 게스트 nav 라벨·위치·링크 정상, 콘솔 key 에러 없음.
 
-**⏳ 이후 — P1**: 멀티role DB 모델 + Magic Link 인증 통일 + 디자인시스템 통합(StepForm/TagInput/AuthShell/RoleSwitcher) + 랜딩 공급측 CTA·waitlist.
+**🔄 진행 중 — P1** (CEO "진행해줘" 지시):
+- ✅ **랜딩 공급측 CTA**: TypingLanding 하단에 "기자단 지원 · 스폰서 문의" discreet 링크 추가 → /writer/apply, /sponsor/register. (이전엔 공개 사이트에 공급측 발견 경로 전무) — 배포·검증 완료.
+- ✅ **스폰서 등록 페이지 디자인 통합**: 구식 브루탈리즘 → 모바일 앱 스타일(app-*, F4F3EE, max-w-md, 둥근 입력/태그칩, 하단 네비) 재작성. 세션 가드 추가(미로그인→/login?next 보존). 기능(필드·태그·register·setRoleCookie) 전부 보존. — 검증 완료(세션 주입 렌더, 콘솔 0), 배포 진행.
+  - 이로써 작가(/writer/apply)·스폰서(/sponsor/register) 온보딩 모두 유저 플로우와 동일 디자인 언어로 통일됨.
+- ⏳ **남은 P1**: 멀티-role DB 모델(겸직, 가장 큰 작업) + Magic Link 인증 완전 통일 + 공용 컴포넌트 추출(StepForm/TagInput/AuthShell/RoleSwitcher) + waitlist.
 
 ---
 
