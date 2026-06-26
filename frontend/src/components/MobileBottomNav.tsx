@@ -166,8 +166,8 @@ const SPONSOR_TABS: Tab[] = [
 
 const GUEST_TABS: Tab[] = [
   { href: "/", label: "홈", icon: (f) => <IconHome filled={f} /> },
+  { href: "/", label: "시작하기", icon: (f) => <IconPlusCircle filled={f} />, center: true },
   { href: "/login", label: "로그인", icon: (f) => <IconPerson filled={f} /> },
-  { href: "/register", label: "시작하기", icon: (f) => <IconPlusCircle filled={f} />, center: true },
 ];
 
 export default function MobileBottomNav() {
@@ -200,7 +200,7 @@ export default function MobileBottomNav() {
           if (tab.center) {
             return (
               <Link
-                key={tab.href}
+                key={tab.label}
                 href={tab.href}
                 className="flex-1 flex flex-col items-center justify-center"
               >
@@ -214,7 +214,7 @@ export default function MobileBottomNav() {
                   </svg>
                 </span>
                 <span className="text-[9px] font-bold tracking-wide text-[#1A1A1A] mt-1 leading-none opacity-60">
-                  의뢰
+                  {tab.label}
                 </span>
               </Link>
             );
@@ -222,7 +222,7 @@ export default function MobileBottomNav() {
 
           return (
             <Link
-              key={tab.href}
+              key={tab.label}
               href={tab.href}
               className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${
                 active ? "text-[#1A1A1A]" : "text-[#AEAAA5]"

@@ -60,7 +60,18 @@
   - `lib/api.ts`에 `writerApi.apply` 추가.
   - **next 보존**: `/auth/callback`이 `next` 파라미터 존중 + 로그인 Magic Link가 callback에 next 전달 → 콜드 게스트가 작가/스폰서 온보딩으로 진입해도 Magic Link 왕복 후 의도 유지(스폰서도 함께 이득).
   - 검증(로컬 dev): /register/writer→/writer/apply→(미인증)→/login?next=/writer/apply ✅, 세션 주입 시 /writer/apply 폼 정상 렌더(필명+전문분야 칩8+합류 버튼) ✅, 콘솔 에러 0.
-- ⚠️ 작가 apply submit→백엔드 E2E는 프리뷰가 Render(엔드포인트 미배포)를 봐서 미실행 → 배포 후 프로덕션 Magic Link 스모크 테스트 예정.
+- ✅ **배포·프로덕션 검증 완료**: 백엔드(Render 자동배포, ~150초) + 프론트(Vercel). 프로덕션 E2E 스모크: register role=admin 주입→user 강제 ✅, 가입→로그인→apply→role writer 승격+프로필 영속 ✅. 프론트 라우팅(/writer/apply 가드/next) 라이브 확인 ✅.
+
+### 📋 발견 이슈 — 하단 탭바 (MobileBottomNav, CEO 질문 계기)
+역할별 탭 구성이 제각각이고 "의뢰 가운데 버튼"이 일관적이지 않음:
+- 로그인 유저: 홈 | **의뢰(가운데 플로팅)** | 마이페이지 ← 정상
+- 작가: 집무실 | 템플릿 | 홈 ← 가운데 액션버튼 없음
+- 스폰서: 대시보드 | 슬롯 | 홈 ← 가운데 액션버튼 없음
+- 게스트: 홈 | 로그인 | "시작하기"(플로팅) ← **버그**
+- **버그1**: 게스트 플로팅 버튼 라벨이 `의뢰`로 하드코딩(MobileBottomNav.tsx:216) — 실제 탭은 "시작하기"인데 화면엔 "의뢰".
+- **버그2**: 게스트 "시작하기"→`/register`→`/` 리다이렉트만 됨(의뢰/온보딩으로 안 이어짐).
+- **레이아웃**: `center:true`는 위치가 아니라 스타일만 바꿈 → 게스트는 플로팅이 가운데 아닌 오른쪽에 옴.
+- ✅ **수정 완료** (CEO "알아서 정리" 지시): 가운데 버튼 라벨 하드코딩 제거(`tab.label` 사용), 게스트 탭바를 `홈 | 시작하기(가운데 플로팅, /) | 로그인`으로 재배치(죽은 `/register` 링크 제거, 플로팅 진짜 가운데로), React key를 고유한 `tab.label`로 변경. 작가·스폰서는 현행 3탭 유지. 검증(로컬 dev): 게스트 nav 라벨·위치·링크 정상, 콘솔 key 에러 없음.
 
 **⏳ 이후 — P1**: 멀티role DB 모델 + Magic Link 인증 통일 + 디자인시스템 통합(StepForm/TagInput/AuthShell/RoleSwitcher) + 랜딩 공급측 CTA·waitlist.
 
