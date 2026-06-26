@@ -182,12 +182,19 @@ export default function TypingLanding() {
           </div>
         )}
 
-        {/* 재방문 유저 — 항상 표시 */}
-        {phase !== "masthead" && phase !== "sent" && (
-          <div style={{ marginTop: "3rem", textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
-            <a href="/login" style={{ fontSize: "0.8rem", color: "#888", textDecoration: "none", borderBottom: "1px solid #ccc", paddingBottom: "1px" }}>
-              이미 구독 중이에요 →
-            </a>
+        {/* 하단 진입점 — 재방문 유저 + 공급측(기자단/스폰서) */}
+        {phase !== "masthead" && (
+          <div style={{ marginTop: "3rem", textAlign: "center", fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.1rem" }}>
+            {phase !== "sent" && (
+              <a href="/login" style={{ fontSize: "0.8rem", color: "#888", textDecoration: "none", borderBottom: "1px solid #ccc", paddingBottom: "1px" }}>
+                이미 구독 중이에요 →
+              </a>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", fontSize: "0.75rem", color: "#A89F8C" }}>
+              <a href="/writer/apply" style={{ color: "#A89F8C", textDecoration: "none" }}>기자단 지원</a>
+              <span style={{ opacity: 0.5 }}>·</span>
+              <a href="/sponsor/register" style={{ color: "#A89F8C", textDecoration: "none" }}>스폰서 문의</a>
+            </div>
           </div>
         )}
       </div>
