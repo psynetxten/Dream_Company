@@ -25,7 +25,12 @@ export default function AuthCallbackPage() {
 
         const role = await getUserRole();
         setRoleCookie(role);
-        router.replace(roleToHome(role));
+
+        // 진입 의도(next) 보존 — 콜드 게스트가 작가/스폰서 온보딩 등으로
+        // 들어오던 흐름을 Magic Link 왕복 후에도 유지. 내부 경로만 허용(오픈리다이렉트 차단).
+        const next = new URLSearchParams(window.location.search).get("next");
+        const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+        router.replace(safeNext || roleToHome(role));
       } catch (err: unknown) {
         setMessage(err instanceof Error ? err.message : "인증에 실패했습니다.");
         setStatus("error");

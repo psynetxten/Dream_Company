@@ -128,8 +128,10 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     try:
         # 1. Supabase Admin API로 유저 생성 (Confirm Email 우회)
         # Note: email_confirm=True로 설정하여 즉시 활성화
-        allowed_roles = {"user", "writer", "sponsor"}
-        role = user_data.role if user_data.role in allowed_roles else "user"
+        # 보안: 클라이언트가 보낸 role은 신뢰하지 않는다. 가입은 항상 "user"로 시작하며,
+        # writer/sponsor 승격은 전용 엔드포인트(POST /writer/apply, POST /sponsor/register)
+        # 에서 서버가 결정한다. (이전엔 client role을 그대로 수용 → 권한상승 가능했음)
+        role = "user"
 
         admin_client = get_supabase_admin()
         res = admin_client.auth.admin.create_user({
@@ -209,12 +211,13 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """이름/역할 업데이트 — 신규 소셜 로그인 유저 온보딩용"""
-    allowed_roles = {"user", "writer", "sponsor"}
+    """이름 업데이트 — 신규 소셜 로그인 유저 온보딩용.
+
+    보안: role은 여기서 변경하지 않는다. 클라이언트가 PATCH로 role을 자가지정하면
+    권한상승이 가능했으므로 제거. writer/sponsor 승격은 전용 엔드포인트에서만 일어난다.
+    """
     if data.full_name is not None:
         current_user.full_name = data.full_name
-    if data.role is not None and data.role in allowed_roles:
-        current_user.role = data.role
     await db.commit()
     await db.refresh(current_user)
     return current_user

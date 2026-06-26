@@ -58,10 +58,15 @@ function LoginForm() {
     setLoading(true);
     setError("");
     try {
+      // 진입 의도(next)를 Magic Link 왕복 후에도 유지하기 위해 callback에 전달
+      const nextPath = searchParams.get("next");
+      const callbackUrl = nextPath
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+        : `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: callbackUrl,
         },
       });
       if (error) throw error;

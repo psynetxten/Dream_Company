@@ -151,6 +151,9 @@ export interface CreditTransaction {
 
 // 작가
 export const writerApi = {
+  /** 작가 지원 — 프로필 생성 + 서버가 role을 writer로 승격 */
+  apply: (data: { pen_name: string; specialties: string[]; bio?: string; portfolio_url?: string }) =>
+    api.post("/writer/apply", data),
   getProfile: () => api.get("/writer/me"),
   getAssignedOrders: () => api.get("/writer/orders"),
   getAvailableOrders: () => api.get("/writer/available-orders"),

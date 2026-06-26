@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.database import get_db
@@ -19,6 +20,65 @@ import structlog
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/writer", tags=["writer"])
+
+
+class WriterApply(BaseModel):
+    pen_name: str
+    specialties: list[str] = []
+    bio: str | None = None
+    portfolio_url: str | None = None
+
+
+@router.post("/apply")
+async def apply_writer(
+    body: WriterApply,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),  # 인증만 — 아직 작가가 아닌 유저도 지원 가능
+):
+    """작가 지원 — 프로필 생성/갱신 + role을 서버가 'writer'로 승격.
+
+    보안: role 승격은 클라이언트가 아니라 이 엔드포인트(서버)에서만 일어난다.
+    (P0: 즉시 승인. 추후 심사가 필요하면 pending 상태 도입.)
+    """
+    if not body.pen_name.strip():
+        raise HTTPException(status_code=400, detail="필명을 입력해주세요.")
+    if not body.specialties:
+        raise HTTPException(status_code=400, detail="전문 분야를 최소 1개 선택해주세요.")
+
+    result = await db.execute(select(WriterProfile).where(WriterProfile.user_id == current_user.id))
+    profile = result.scalar_one_or_none()
+
+    if profile:
+        profile.pen_name = body.pen_name
+        profile.specialties = body.specialties
+        if body.bio is not None:
+            profile.bio = body.bio
+        if body.portfolio_url is not None:
+            profile.portfolio_url = body.portfolio_url
+    else:
+        profile = WriterProfile(
+            user_id=current_user.id,
+            pen_name=body.pen_name,
+            specialties=body.specialties,
+            bio=body.bio,
+            portfolio_url=body.portfolio_url,
+        )
+        db.add(profile)
+
+    # 역할 서버 승격 (단방향 — 멀티role 전환은 P1)
+    if current_user.role not in ("writer", "admin"):
+        current_user.role = "writer"
+
+    await db.commit()
+    await db.refresh(profile)
+    logger.info("writer_applied", user_id=str(current_user.id), pen_name=body.pen_name)
+    return {
+        "status": "success",
+        "role": current_user.role,
+        "pen_name": profile.pen_name,
+        "specialties": profile.specialties,
+    }
+
 
 @router.get("/me")
 async def get_writer_profile(

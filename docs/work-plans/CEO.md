@@ -48,10 +48,19 @@
   - 랜딩 `page.tsx` 스폰서 등록 링크 → `/sponsor/register`.
 - 검증(로컬 dev): role=user로 /sponsor/register 접근 가능·새 카피 확인, /register/sponsor 리다이렉트 확인, /sponsor/dashboard는 여전히 차단, 콘솔 에러 0.
 
-**⏳ 다음 — P0-1/P0-2 백엔드 보안+작가 엔드포인트 (별도 단위, Docker 검증 필요)**
-- P0-1: `/auth/register`·`PATCH /auth/me`에서 클라이언트 role 신뢰 제거(서버 결정). ⚠️ 단독 배포 시 작가 가입(registerAndLogin("writer")) 깨짐 → P0-2와 함께.
-- P0-2: 작가 지원 엔드포인트(`POST /writer/apply`) 신설 — 필명/전문분야/bio 저장 + role 서버 승격. 프론트 `/register/writer`를 Magic Link로 전환.
-- 백엔드는 Docker 미실행 상태라 로컬 검증하려면 `docker compose up` 필요. render.yaml로 배포.
+**✅ 완료 — P0-1/P0-2 백엔드 보안 + 작가 온보딩 (Docker로 로컬 검증 완료)**
+- **P0-1 보안**: `auth.py` register는 항상 role="user"(클라이언트 role 무시), `PATCH /auth/me`에서 role 자가지정 제거.
+  - 검증(로컬 Docker): register에 role="admin" 주입 → 응답 role "user" ✅
+- **P0-2 작가 지원**: `POST /writer/apply` 신설 — 인증만 요구, 필명/전문분야/bio 저장 + role 서버 승격(WriterProfile에 필드 이미 존재 → 마이그레이션 불필요).
+  - 검증(로컬 Docker, 실DB): 가입(user)→로그인→apply→role "writer" 승격 + /writer/me에 pen_name/specialties 영속 확인 ✅ (이전엔 버려지던 데이터)
+  - 무인증 apply → 401 ✅
+- **프론트 작가 온보딩**:
+  - 신규 `/writer/apply` 페이지 — Magic Link 인증 후 필명/전문분야/자기소개 입력 → writerApi.apply → setRoleCookie("writer") → 대시보드. **모바일 앱 스타일(app-*)로 작성 — P1 디자인 통합 일부 달성.**
+  - `/register/writer`(구식 password) → `/writer/apply`로 리다이렉트.
+  - `lib/api.ts`에 `writerApi.apply` 추가.
+  - **next 보존**: `/auth/callback`이 `next` 파라미터 존중 + 로그인 Magic Link가 callback에 next 전달 → 콜드 게스트가 작가/스폰서 온보딩으로 진입해도 Magic Link 왕복 후 의도 유지(스폰서도 함께 이득).
+  - 검증(로컬 dev): /register/writer→/writer/apply→(미인증)→/login?next=/writer/apply ✅, 세션 주입 시 /writer/apply 폼 정상 렌더(필명+전문분야 칩8+합류 버튼) ✅, 콘솔 에러 0.
+- ⚠️ 작가 apply submit→백엔드 E2E는 프리뷰가 Render(엔드포인트 미배포)를 봐서 미실행 → 배포 후 프로덕션 Magic Link 스모크 테스트 예정.
 
 **⏳ 이후 — P1**: 멀티role DB 모델 + Magic Link 인증 통일 + 디자인시스템 통합(StepForm/TagInput/AuthShell/RoleSwitcher) + 랜딩 공급측 CTA·waitlist.
 
