@@ -65,9 +65,12 @@ async def apply_writer(
         )
         db.add(profile)
 
-    # 역할 서버 승격 (단방향 — 멀티role 전환은 P1)
-    if current_user.role not in ("writer", "admin"):
-        current_user.role = "writer"
+    # 멀티-role: 기존 역할을 덮어쓰지 않고 보유 집합에 "writer"를 추가하고 활성 role로 전환.
+    roles = list(current_user.roles or ([current_user.role] if current_user.role else []))
+    if "writer" not in roles:
+        roles.append("writer")
+    current_user.roles = roles
+    current_user.role = "writer"
 
     await db.commit()
     await db.refresh(profile)
@@ -75,6 +78,7 @@ async def apply_writer(
     return {
         "status": "success",
         "role": current_user.role,
+        "roles": current_user.roles,
         "pen_name": profile.pen_name,
         "specialties": profile.specialties,
     }

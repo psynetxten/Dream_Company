@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, Integer, func, Uuid
+from sqlalchemy import String, Boolean, DateTime, Integer, func, Uuid, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -17,7 +17,11 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(
         String(20), nullable=False, default="user", index=True
-    )  # user | writer | sponsor | admin
+    )  # 활성(active) role — 라우팅/포털 결정용. user | writer | sponsor | admin
+    # 보유한 역할 집합 (멀티-role 겸직). 활성 role은 항상 이 안에 포함됨.
+    roles: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, server_default="{}", default=list
+    )
 
     # 소셜 로그인 제공자 정보
     oauth_provider: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True) # kakao | google | naver

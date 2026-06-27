@@ -53,9 +53,12 @@ async def register_sponsor(
         )
         db.add(profile)
 
-    # 스폰서 등록 시 user role 자동 업그레이드
-    if current_user.role not in ("sponsor", "admin"):
-        current_user.role = "sponsor"
+    # 멀티-role: 기존 역할을 덮어쓰지 않고 보유 집합에 "sponsor" 추가 + 활성 role 전환
+    roles = list(current_user.roles or ([current_user.role] if current_user.role else []))
+    if "sponsor" not in roles:
+        roles.append("sponsor")
+    current_user.roles = roles
+    current_user.role = "sponsor"
 
     await db.commit()
     await db.refresh(profile)
