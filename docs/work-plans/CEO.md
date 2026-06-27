@@ -85,7 +85,15 @@
   - 🚨 **배포 시 인시던트 발생·복구**: Render DB에 마이그레이션이 적용 안 돼(`column users.roles does not exist`) **프로덕션 인증 전체 장애**(register 400, /auth/me 500). 원인: Dockerfile이 `alembic upgrade head; uvicorn`(실패해도 기동)인데 Render alembic 체인이 어긋나 마이그레이션 미적용. **즉시 백엔드를 직전(b87d2c6)으로 롤백→복구 확인**(/auth/me 200, 작가지원 정상). 멀티-role 코드는 git e87d9c7에 보존.
   - 프론트(스위처/nav)는 유지 — roles 부재 시 스위처 자동 숨김이라 무해. 작가/스폰서 nav "더보기"(/profile)도 정상.
   - 교훈 메모리화: [Render 마이그레이션 위험](../../../../.claude/.../project_render_migration_risk.md).
-  - ⏳ **멀티-role 재적용 계획(별도·신중)**: Render alembic 현재 리비전 확인 필요(CEO가 Render Shell `alembic current` 또는 DATABASE_URL 제공) → idempotent DDL(`ADD COLUMN IF NOT EXISTS`)로 컬럼 보장 → 코드 재적용(e87d9c7 cherry-pick) → 프로덕션 인증 E2E 확인.
+  - ✅ **멀티-role 재적용·배포 완료 (인시던트 해결)**: 백엔드 DB가 **Supabase Postgres**(`qzlcpfrhwjgjafdafrva`)임을 발견 → Supabase MCP로 `users.roles` 컬럼을 프로덕션 DB에 직접 선적용(+backfill) → 멀티-role 코드 재배포 → **프로덕션 E2E 전부 통과**(가입 `[user]`→작가 `[user,writer]`→스폰서 `[user,writer,sponsor]` 3겸직, /auth/me 200, 활성전환, 미보유 admin 403). alembic 마이그레이션은 멱등(IF NOT EXISTS)으로 변경. Render alembic 의존 제거.
+  - 교훈: Render 백엔드 DB = Supabase Postgres이므로 **앞으로 스키마 변경은 Supabase MCP로 직접 적용**하면 안전(Render alembic 우회).
+
+### 🚨🚨 긴급 보안 (2026-06-26 발견) — RLS 비활성, 전체 유저 데이터 노출
+- Supabase의 모든 16개 public 테이블에 **RLS(Row Level Security) 비활성** → 공개 anon 키로 전 테이블 읽기/쓰기 가능.
+- **실측 확인**: 공개 anon 키로 `GET /rest/v1/users?select=id,email` → 실제 유저 이메일 반환(HTTP 200). anon 키는 프론트 번들·render.yaml에 공개돼 있어 **누구나 전체 유저 이메일 열람 + 모든 테이블 수정 가능**.
+- 영향: users(이메일), orders, newspapers, sponsors 등 전부.
+- 백엔드는 DATABASE_URL 직접 연결(postgres role)이라 RLS 켜도 **앱은 정상 동작 추정**(RLS는 anon/authenticated PostgREST 접근만 차단). 단 보안 설정 변경이라 CTO가 임의 적용 안 함 — **CEO 결정 필요**.
+- 권장: `ALTER TABLE public.<each> ENABLE ROW LEVEL SECURITY;` (16개 테이블). 백엔드 직접연결은 영향 없음. 적용 후 프론트/백엔드 회귀 확인.
 - ⏳ **남은 P1(선택)**: Magic Link 인증 완전 통일, 공용 컴포넌트 추출, waitlist, first-value 미리보기.
 
 ---
