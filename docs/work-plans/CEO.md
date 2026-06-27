@@ -4,7 +4,7 @@
 
 ## 🔄 진행 중 (2026-06-27) — 결제 연동 (PortOne v2, 간편결제)
 
-**결정:** 결제수단 간편결제 위주(카카오페이 등), CEO가 Portone 처음 → 셋업 안내 받기로.
+**결정(2026-06-27 갱신):** **이중 결제** — 해외=Stripe(이미 코딩됨), 국내=Portone 간편결제(카카오페이/네이버페이/토스페이). 각 시장 강점 커버. 백엔드 Portone 검증은 결제수단 무관하게 동작하므로 3종 간편결제 모두 동일 검증 경로 재사용.
 
 **✅ 백엔드 결제 검증 기반 완료 (Docker 검증, 키 없으면 비활성 → 무료 플로우 무영향):**
 - `config.py`: `PORTONE_API_SECRET`, `PORTONE_STORE_ID` 추가.
@@ -14,7 +14,7 @@
 
 **⏳ CEO 액션 — Portone 셋업 (이게 있어야 프론트 연결+테스트 가능):**
 1. https://admin.portone.io 가입 → 콘솔.
-2. 결제연동 → **채널 추가** → 카카오페이(또는 카드) **테스트** 채널 연결 → `channelKey` 확보.
+2. 결제연동 → **채널 추가** → **카카오페이 / 네이버페이 / 토스페이** 각각 **테스트** 채널 연결 → 각 `channelKey` 확보 (3개).
 3. 상점 → `Store ID`(store-...), API Keys → `API secret` 확보.
 4. 전달/설정: **Render 백엔드 env** `PORTONE_API_SECRET`, `PORTONE_STORE_ID` / **Vercel(frontend) env** `NEXT_PUBLIC_PORTONE_STORE_ID`, `NEXT_PUBLIC_PORTONE_CHANNEL_KEY`.
 - 위가 준비되면 → 프론트 SDK(@portone/browser-sdk) + OrderForm 프리미엄 결제 UI 연결 + 테스트모드 실결제 검증.
