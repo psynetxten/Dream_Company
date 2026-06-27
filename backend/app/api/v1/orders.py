@@ -175,8 +175,9 @@ async def _process_order_background(order_id: str):
 
         await db.flush()
 
-        # 무료/크레딧 플랜: 첫 번째 에피소드 즉시 생성
-        if order.payment_type in ("free", "credits"):
+        # 첫 번째 에피소드 즉시 생성 (무료/크레딧/유료 모두 — 시작 직후 바로 1화 제공)
+        # 이 함수는 정당한 시작(무료/크레딧 start 또는 결제 검증 완료) 후에만 호출됨.
+        if True:
             from app.tasks.daily_publish import process_single_schedule
             import asyncio as _asyncio
 

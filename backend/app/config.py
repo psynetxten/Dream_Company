@@ -96,10 +96,19 @@ class Settings(BaseSettings):
     PUBLISH_TIMEZONE: str = "Asia/Seoul"
 
     # ============================
-    # Stripe 결제
+    # Stripe 결제 (레거시)
     # ============================
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+
+    # ============================
+    # PortOne(아임포트) v2 결제 — 국내 간편결제
+    # PORTONE_API_SECRET: 백엔드 결제 검증용 시크릿 (PortOne 콘솔 → API Keys)
+    # PORTONE_STORE_ID:   상점 ID (store-... 형식)
+    # 프론트는 NEXT_PUBLIC_PORTONE_STORE_ID + NEXT_PUBLIC_PORTONE_CHANNEL_KEY 사용
+    # ============================
+    PORTONE_API_SECRET: str = ""
+    PORTONE_STORE_ID: str = ""
 
     # ============================
     # Resend 이메일

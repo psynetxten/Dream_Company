@@ -9,6 +9,8 @@ Stripe 결제 API
 import uuid
 import asyncio
 import stripe
+from datetime import datetime, timezone
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -77,6 +79,80 @@ async def _credit_checkout(metadata: dict, name: str, desc: str, amount: int,
         None,
         lambda: _sync_create_stripe_session(metadata, name, desc, amount, success_url, cancel_url),
     )
+
+
+# ─────────────────────────────────────────────
+# PortOne(아임포트) v2 — 의뢰 프리미엄 결제
+# ─────────────────────────────────────────────
+
+class PortoneCompleteRequest(BaseModel):
+    payment_id: str          # PortOne 결제번호 (프론트 SDK가 반환)
+    order_id: uuid.UUID
+
+
+@router.get("/portone/config")
+async def portone_public_config():
+    """프론트가 결제 가능 여부/가격을 확인하는 공개 설정."""
+    return {
+        "enabled": bool(settings.PORTONE_API_SECRET and settings.PORTONE_STORE_ID),
+        "plan_prices": PLAN_PRICES,
+    }
+
+
+@router.post("/portone/complete")
+async def portone_complete(
+    body: PortoneCompleteRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """PortOne 결제 완료 후 서버 검증 → 주문 결제완료 + 발행 시작.
+
+    보안: 클라이언트의 '결제 성공' 신호를 믿지 않고, payment_id로 PortOne API를
+    직접 조회해 status=PAID + 금액 일치를 서버가 확인한 뒤에만 paid 처리한다.
+    """
+    if not (settings.PORTONE_API_SECRET and settings.PORTONE_STORE_ID):
+        raise HTTPException(status_code=503, detail="결제 서비스가 설정되지 않았습니다.")
+
+    result = await db.execute(select(Order).where(Order.id == body.order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다.")
+    if order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    if order.payment_status == "paid":
+        return {"status": "already_paid", "order_id": str(order.id)}  # 멱등
+
+    # PortOne 서버 검증
+    from app.services.portone_service import verify_payment
+    loop = asyncio.get_event_loop()
+    v = await loop.run_in_executor(None, lambda: verify_payment(body.payment_id))
+    if not v["ok"] or v["status"] != "PAID":
+        raise HTTPException(status_code=402, detail=f"결제 검증 실패: {v.get('error') or v.get('status')}")
+
+    expected = PLAN_PRICES.get(order.duration_days, 9_900)
+    if v["amount"] != expected:
+        logger.warning("portone_amount_mismatch", order_id=str(order.id),
+                       expected=expected, actual=v["amount"])
+        raise HTTPException(status_code=400, detail=f"결제 금액이 일치하지 않습니다 (기대 {expected:,}원).")
+
+    # 결제 완료 처리
+    order.payment_status = "paid"
+    order.imp_uid = body.payment_id
+    order.amount_krw = v["amount"]
+    method = v["raw"].get("method")
+    order.payment_method = method.get("type") if isinstance(method, dict) else None
+    if order.status == "draft":
+        order.status = "active"
+        order.starts_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    # 발행 시작 (스케줄 생성 + 첫 화 즉시 생성)
+    from app.api.v1.orders import _process_order_background
+    background_tasks.add_task(_process_order_background, str(order.id))
+
+    logger.info("portone_payment_confirmed", order_id=str(order.id), amount=v["amount"])
+    return {"status": "paid", "order_id": str(order.id)}
 
 
 # ─────────────────────────────────────────────

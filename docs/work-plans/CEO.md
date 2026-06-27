@@ -2,6 +2,25 @@
 
 ---
 
+## 🔄 진행 중 (2026-06-27) — 결제 연동 (PortOne v2, 간편결제)
+
+**결정:** 결제수단 간편결제 위주(카카오페이 등), CEO가 Portone 처음 → 셋업 안내 받기로.
+
+**✅ 백엔드 결제 검증 기반 완료 (Docker 검증, 키 없으면 비활성 → 무료 플로우 무영향):**
+- `config.py`: `PORTONE_API_SECRET`, `PORTONE_STORE_ID` 추가.
+- `services/portone_service.py`: PortOne v2 API로 결제 서버검증(`GET /payments/{id}`, status=PAID+금액 확인). 클라 신호 불신.
+- `payment.py`: `GET /payment/portone/config`(enabled/가격), `POST /payment/portone/complete`(검증→결제완료→발행시작). 금액은 PLAN_PRICES(7=9,900/14=19,900/30=39,900) 대조.
+- `orders.py`: 결제 직후 첫 화 즉시 생성되도록 확장(유료 포함).
+
+**⏳ CEO 액션 — Portone 셋업 (이게 있어야 프론트 연결+테스트 가능):**
+1. https://admin.portone.io 가입 → 콘솔.
+2. 결제연동 → **채널 추가** → 카카오페이(또는 카드) **테스트** 채널 연결 → `channelKey` 확보.
+3. 상점 → `Store ID`(store-...), API Keys → `API secret` 확보.
+4. 전달/설정: **Render 백엔드 env** `PORTONE_API_SECRET`, `PORTONE_STORE_ID` / **Vercel(frontend) env** `NEXT_PUBLIC_PORTONE_STORE_ID`, `NEXT_PUBLIC_PORTONE_CHANNEL_KEY`.
+- 위가 준비되면 → 프론트 SDK(@portone/browser-sdk) + OrderForm 프리미엄 결제 UI 연결 + 테스트모드 실결제 검증.
+
+---
+
 ## ✅ 완료 (2026-06-27) — 이메일 알림 (Resend) 프로덕션 작동 확인
 
 - 🔑 CEO가 Render에 `RESEND_API_KEY` 추가 완료.
