@@ -88,12 +88,19 @@
   - ✅ **멀티-role 재적용·배포 완료 (인시던트 해결)**: 백엔드 DB가 **Supabase Postgres**(`qzlcpfrhwjgjafdafrva`)임을 발견 → Supabase MCP로 `users.roles` 컬럼을 프로덕션 DB에 직접 선적용(+backfill) → 멀티-role 코드 재배포 → **프로덕션 E2E 전부 통과**(가입 `[user]`→작가 `[user,writer]`→스폰서 `[user,writer,sponsor]` 3겸직, /auth/me 200, 활성전환, 미보유 admin 403). alembic 마이그레이션은 멱등(IF NOT EXISTS)으로 변경. Render alembic 의존 제거.
   - 교훈: Render 백엔드 DB = Supabase Postgres이므로 **앞으로 스키마 변경은 Supabase MCP로 직접 적용**하면 안전(Render alembic 우회).
 
-### 🚨🚨 긴급 보안 (2026-06-26 발견) — RLS 비활성, 전체 유저 데이터 노출
+### ✅ 보안 해결 (2026-06-26) — RLS 활성화로 유저 데이터 노출 차단
+- CEO 승인 후 16개 public 테이블 전부 `ENABLE ROW LEVEL SECURITY` 적용(Supabase MCP).
+- 사전 확인: 프론트·백엔드 모두 anon 키 PostgREST로 테이블 직접 접근 안 함(`.from()`/`.table()` 미사용), 백엔드는 DATABASE_URL 직접연결(RLS 우회) → RLS 켜도 앱 무영향.
+- 검증: anon 키로 users/orders 조회 → 이제 **빈 배열**(차단됨, 이전엔 실제 이메일 반환). 앱 인증 회귀: 가입/로그인/`/auth/me` 200/작가지원 success/공개 신문 피드 200 — 전부 정상.
+- 참고: 정책(policy)은 추가 안 함(anon 직접 접근을 의도적으로 전면 차단; 데이터는 백엔드 경유만). 추후 프론트에서 anon 직접 읽기가 필요해지면 그때 정책 설계.
+
+<details><summary>이력: 발견 당시 기록 (RLS 비활성, 전체 유저 데이터 노출)</summary>
 - Supabase의 모든 16개 public 테이블에 **RLS(Row Level Security) 비활성** → 공개 anon 키로 전 테이블 읽기/쓰기 가능.
 - **실측 확인**: 공개 anon 키로 `GET /rest/v1/users?select=id,email` → 실제 유저 이메일 반환(HTTP 200). anon 키는 프론트 번들·render.yaml에 공개돼 있어 **누구나 전체 유저 이메일 열람 + 모든 테이블 수정 가능**.
 - 영향: users(이메일), orders, newspapers, sponsors 등 전부.
 - 백엔드는 DATABASE_URL 직접 연결(postgres role)이라 RLS 켜도 **앱은 정상 동작 추정**(RLS는 anon/authenticated PostgREST 접근만 차단). 단 보안 설정 변경이라 CTO가 임의 적용 안 함 — **CEO 결정 필요**.
 - 권장: `ALTER TABLE public.<each> ENABLE ROW LEVEL SECURITY;` (16개 테이블). 백엔드 직접연결은 영향 없음. 적용 후 프론트/백엔드 회귀 확인.
+</details>
 - ⏳ **남은 P1(선택)**: Magic Link 인증 완전 통일, 공용 컴포넌트 추출, waitlist, first-value 미리보기.
 
 ---
