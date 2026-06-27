@@ -59,9 +59,9 @@ def send_newspaper_published(
                     color: #666; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 16px; }}
   .headline {{ font-size: 24px; font-weight: 900; line-height: 1.3; margin-bottom: 20px; color: #1a1a1a; }}
   .progress {{ font-family: monospace; font-size: 13px; color: #666; margin-bottom: 24px; }}
-  .cta {{ display: inline-block; background: #1a1a1a; color: #f5f0e8; padding: 14px 32px;
+  .cta {{ display: inline-block; background: #C9A84C; color: #1a1a1a; padding: 14px 32px;
           font-weight: 700; text-decoration: none; letter-spacing: 2px; font-size: 13px;
-          text-transform: uppercase; }}
+          text-transform: uppercase; border-radius: 2px; }}
   .footer {{ border-top: 1px solid #ccc; padding: 16px 32px; font-size: 11px; color: #999;
              text-align: center; font-family: sans-serif; }}
 </style>
@@ -80,7 +80,7 @@ def send_newspaper_published(
     <div class="progress">
       연재 진행 [{progress_bar}] {episode_number}/{total_episodes}
     </div>
-    <a href="{read_url}" class="cta">오늘의 신문 읽기 →</a>
+    <a href="{read_url}" class="cta" style="display:inline-block;background:#C9A84C;color:#1a1a1a;padding:14px 32px;font-weight:700;text-decoration:none;letter-spacing:2px;font-size:13px;text-transform:uppercase;border-radius:2px;">오늘의 신문 읽기 →</a>
   </div>
   <div class="footer">
     꿈신문사 &nbsp;·&nbsp; 구독을 원하지 않으시면 대시보드에서 설정하세요.
@@ -111,9 +111,9 @@ def send_series_completed(email: str, full_name: str, duration_days: int) -> boo
   .big {{ font-size: 48px; margin-bottom: 16px; }}
   .title {{ font-size: 22px; font-weight: 900; margin-bottom: 12px; }}
   .desc {{ color: #666; font-size: 14px; line-height: 1.8; margin-bottom: 28px; }}
-  .cta {{ display: inline-block; background: #1a1a1a; color: #f5f0e8; padding: 14px 32px;
+  .cta {{ display: inline-block; background: #C9A84C; color: #1a1a1a; padding: 14px 32px;
           font-weight: 700; text-decoration: none; letter-spacing: 2px; font-size: 13px;
-          text-transform: uppercase; }}
+          text-transform: uppercase; border-radius: 2px; }}
 </style>
 </head>
 <body>
@@ -127,7 +127,7 @@ def send_series_completed(email: str, full_name: str, duration_days: int) -> boo
       그 꿈은 여전히 유효합니다.<br>
       새로운 시리즈로 더 깊이 들어가 보세요.
     </p>
-    <a href="{settings.FRONTEND_URL}/order/new" class="cta">새 시리즈 시작하기 →</a>
+    <a href="{settings.FRONTEND_URL}/order/new" class="cta" style="display:inline-block;background:#C9A84C;color:#1a1a1a;padding:14px 32px;font-weight:700;text-decoration:none;letter-spacing:2px;font-size:13px;text-transform:uppercase;border-radius:2px;">새 시리즈 시작하기 →</a>
   </div>
 </div>
 </body>
