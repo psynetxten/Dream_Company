@@ -2,6 +2,21 @@
 
 ---
 
+## ✅ 완료 (2026-06-27) — 이메일 알림 (Resend) 코드 완성
+
+- 진단: 이메일 인프라가 이미 대부분 구축돼 있었음 — `app/services/email_service.py`(발행알림+시리즈완료 템플릿), config `RESEND_API_KEY`/`FROM_EMAIL`/`FROM_NAME`, `resend` 라이브러리(2.26.0), daily_publish에 발행알림 연결.
+- 수정: 누락됐던 **시리즈 완료 메일(`send_series_completed`) 연결** — daily_publish에서 마지막 화(`episode_number >= duration_days`) 발행 시 발송.
+- 검증(Docker): 백엔드 클린 리로드, 두 이메일 함수 템플릿 정상 렌더 + 키 없을 때 정상 스킵(`email_skipped_no_api_key`, 반환 False).
+- Magic Link 발신자명은 이미 커스텀("꿈신문사 <noreply@dreamnewspaper.com>", 지난 E2E 확인) → 별도 작업 불필요.
+
+### 🔑 CEO 필수 액션 — RESEND_API_KEY 설정 (이것만 하면 이메일 발송 활성화)
+1. Resend 대시보드에서 API 키 발급 + 발신 도메인(dreamnewspaper.com) 인증(SPF/DKIM).
+2. **Render** 백엔드 환경변수에 `RESEND_API_KEY` 추가(render.yaml의 sync:false 항목과 동일 방식).
+3. (선택) 로컬 테스트하려면 `backend/.env`에도 `RESEND_API_KEY` 추가.
+- 키 설정 전까지는 발송이 자동 스킵되어 앱은 정상 동작(무중단). 키 설정 후 실제 발행 1건으로 수신 확인 권장.
+
+---
+
 ## 🗓️ 회의록 (2026-06-26) — 작가·스폰서 유입 개선 전 직원 회의
 
 **참석:** PM / UX 리서처 / 그로스 / 프론트엔드 (CTO 주재·종합)

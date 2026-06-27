@@ -180,7 +180,10 @@ async def process_single_schedule(
                 user_result = await db.execute(select(User).where(User.id == order.user_id))
                 user = user_result.scalar_one_or_none()
                 if user and user.email and settings.RESEND_API_KEY:
-                    from app.services.email_service import send_newspaper_published
+                    from app.services.email_service import (
+                        send_newspaper_published,
+                        send_series_completed,
+                    )
                     loop = asyncio.get_event_loop()
                     await loop.run_in_executor(None, lambda: send_newspaper_published(
                         email=user.email,
@@ -190,6 +193,13 @@ async def process_single_schedule(
                         total_episodes=order.duration_days,
                         newspaper_id=str(newspaper.id),
                     ))
+                    # 마지막 화 발행 시 시리즈 완료 메일도 발송
+                    if schedule.episode_number >= order.duration_days:
+                        await loop.run_in_executor(None, lambda: send_series_completed(
+                            email=user.email,
+                            full_name=user.full_name,
+                            duration_days=order.duration_days,
+                        ))
             except Exception as e:
                 logger.warning("email_notification_failed", error=str(e))
 
