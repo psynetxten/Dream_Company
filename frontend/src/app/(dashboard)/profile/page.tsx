@@ -116,6 +116,49 @@ export default function ProfilePage() {
           </Link>
         </div>
 
+        {/* 더 참여하기 — 아직 보유하지 않은 역할만 노출 */}
+        {(!roles.includes("writer") || !roles.includes("sponsor")) && (
+          <div>
+            <p className="app-section-label mb-2 px-1">더 참여하기</p>
+            <div className="app-card divide-y divide-[#F4F3EE] p-0 overflow-hidden">
+              {!roles.includes("writer") && (
+                <Link
+                  href="/writer/apply"
+                  className="flex items-center justify-between px-4 py-4 active:bg-[#F4F3EE] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">🖋️</span>
+                    <div>
+                      <p className="text-sm font-medium text-[#1A1A1A]">기자단으로 활동하기</p>
+                      <p className="text-xs text-[#AEAAA5]">당신의 펜으로 누군가의 꿈을 신문에</p>
+                    </div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M6 4l4 4-4 4" stroke="#AEAAA5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </Link>
+              )}
+              {!roles.includes("sponsor") && (
+                <Link
+                  href="/sponsor/register"
+                  className="flex items-center justify-between px-4 py-4 active:bg-[#F4F3EE] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">🏢</span>
+                    <div>
+                      <p className="text-sm font-medium text-[#1A1A1A]">브랜드 스폰서 되기</p>
+                      <p className="text-xs text-[#AEAAA5]">미래를 꿈꾸는 독자에게 자연스럽게</p>
+                    </div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M6 4l4 4-4 4" stroke="#AEAAA5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 지원 & 정보 */}
         <div className="app-card divide-y divide-[#F4F3EE] p-0 overflow-hidden">
           <a

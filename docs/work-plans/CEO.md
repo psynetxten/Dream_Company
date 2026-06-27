@@ -101,7 +101,9 @@
 - 백엔드는 DATABASE_URL 직접 연결(postgres role)이라 RLS 켜도 **앱은 정상 동작 추정**(RLS는 anon/authenticated PostgREST 접근만 차단). 단 보안 설정 변경이라 CTO가 임의 적용 안 함 — **CEO 결정 필요**.
 - 권장: `ALTER TABLE public.<each> ENABLE ROW LEVEL SECURITY;` (16개 테이블). 백엔드 직접연결은 영향 없음. 적용 후 프론트/백엔드 회귀 확인.
 </details>
-- ⏳ **남은 P1(선택)**: Magic Link 인증 완전 통일, 공용 컴포넌트 추출, waitlist, first-value 미리보기.
+- ✅ **로그인 독자 → 공급측 발견 경로**: 프로필 페이지에 "더 참여하기" 카드 추가 — 보유하지 않은 역할만 노출(roles 배열 활용). "기자단으로 활동하기"(/writer/apply), "브랜드 스폰서 되기"(/sponsor/register). 가장 열성적인 독자가 최고 공급 후보 → 전환 유도. 검증(prod 백엔드 토큰): CTA 노출/숨김·렌더·콘솔0 확인.
+- ✅ **Magic Link 인증 완전 통일**: 죽은 코드 `registerAndLogin`(password 방식 잔재) 제거 — 모든 가입이 Magic Link 경유. (호출처 없음 확인)
+- ⏳ **남은 P1(선택, 데이터 축적 후 효과)**: 공용 컴포넌트 추출(리팩터링), waitlist, first-value 미리보기("N명이 당신 분야를 꿈꿈" — 현재 꿈 데이터 적어 보류).
 
 ---
 
