@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 from typing import Any, Callable
 import anthropic
 from app.config import settings
@@ -7,6 +8,30 @@ import structlog
 logger = structlog.get_logger()
 
 _RETRY_DELAYS = [10, 30, 60]  # 재시도 대기(초)
+
+# ── 토큰 사용량 실측 집계 (신문 1편 단위) ──
+# asyncio.gather는 각 코루틴을 별도 태스크로 감싸고 태스크마다 컨텍스트를 복사하므로,
+# 신문별로 reset_usage_tracking()을 호출하면 동시 생성돼도 서로 격리되어 정확히 집계된다.
+_usage_ctx: contextvars.ContextVar[dict | None] = contextvars.ContextVar("usage_ctx", default=None)
+
+
+def reset_usage_tracking() -> None:
+    """현재 컨텍스트의 토큰 집계 초기화 (신문 생성 시작 시 호출)"""
+    _usage_ctx.set({"input": 0, "output": 0, "calls": 0})
+
+
+def get_usage_tracking() -> dict | None:
+    """누적된 토큰 사용량 반환 ({input, output, calls}) — 미초기화면 None"""
+    return _usage_ctx.get()
+
+
+def _record_usage(response: Any) -> None:
+    acc = _usage_ctx.get()
+    usage = getattr(response, "usage", None)
+    if acc is not None and usage is not None:
+        acc["input"] += getattr(usage, "input_tokens", 0) or 0
+        acc["output"] += getattr(usage, "output_tokens", 0) or 0
+        acc["calls"] += 1
 
 
 def _call_anthropic(prompt: str, system: str = "", model: str = "", max_tokens: int = 4096) -> str:
@@ -23,6 +48,7 @@ def _call_anthropic(prompt: str, system: str = "", model: str = "", max_tokens: 
         kwargs["system"] = system
 
     response = client.messages.create(**kwargs)
+    _record_usage(response)
     return response.content[0].text
 
 
@@ -42,6 +68,7 @@ async def _call_anthropic_async(
         kwargs["system"] = system
 
     response = await client.messages.create(**kwargs)
+    _record_usage(response)
     return response.content[0].text
 
 

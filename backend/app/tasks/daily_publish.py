@@ -14,6 +14,7 @@ from app.models.schedule import PublicationSchedule
 from app.models.order import Order
 from app.models.newspaper import Newspaper
 from app.agents.editor_in_chief.agent import EditorInChief
+from app.agents.base_agent import reset_usage_tracking, get_usage_tracking
 from app.config import settings
 from app.models.user import User
 from app.core import progress_store
@@ -34,6 +35,9 @@ async def process_single_schedule(
     """단일 스케줄 처리"""
     async with semaphore:
         try:
+            # 토큰 실측 집계 시작 (이 신문 1편 파이프라인 전체: 스폰서매칭+작성+요약+SNS)
+            reset_usage_tracking()
+
             # 처리 중으로 상태 변경
             schedule.status = "processing"
             await db.flush()
@@ -117,6 +121,9 @@ async def process_single_schedule(
                 previous_summary=previous_summary,
             )
 
+            # 토큰 실측 집계 읽기 (파이프라인 전체 합산)
+            _usage = get_usage_tracking() or {"input": 0, "output": 0}
+
             # DB에 신문 저장
             newspaper = Newspaper(
                 order_id=order.id,
@@ -142,7 +149,9 @@ async def process_single_schedule(
                 },
                 ai_model=newspaper_content.get("ai_model"),
                 generation_ms=newspaper_content.get("generation_ms"),
-                token_count=newspaper_content.get("token_count"),
+                token_count=_usage["input"] + _usage["output"],
+                input_tokens=_usage["input"],
+                output_tokens=_usage["output"],
                 sns_copy=newspaper_content.get("sns_copy", {}),
                 visual_prompt=newspaper_content.get("visual_prompt"),
                 status="published",

@@ -55,7 +55,9 @@ class Newspaper(Base):
     # AI 생성 메타
     ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     generation_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)   # 입력+출력 합계
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 실측 입력 토큰
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True) # 실측 출력 토큰 (단가 5배)
 
     # 신규 추가: 마케팅 및 콘텐츠 에셋
     sns_copy: Mapped[dict | None] = mapped_column(JSON, default=dict, nullable=True) # 마케팅 팀장 제작
