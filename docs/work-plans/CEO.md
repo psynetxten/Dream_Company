@@ -2,6 +2,36 @@
 
 ---
 
+## 📌 현재 상태 스냅샷 (2026-07-03 기준 — 새 세션은 여기부터 읽기)
+
+> 아래 로그는 최신순. 이 스냅샷 하나로 전체 맥락 파악 가능. 세부는 각 날짜 항목·메모리 참조.
+
+### ✅ 라이브 (배포·검증 완료)
+- **공급측 온보딩 전면 개편**: 작가(`/writer/apply`)·스폰서(`/sponsor/register`) — Magic Link 인증, 모바일 앱 디자인, 프로필 데이터 저장(이전엔 유실), 미들웨어 가드 예외(가입 경로만).
+- **보안 2건**: ① role 권한상승 차단(register/PATCH me가 클라 role 무시) ② Supabase 16개 테이블 RLS 활성화(anon 키 노출 차단).
+- **멀티-role 겸직**: 한 계정이 독자+작가+스폰서 보유(`users.roles` 배열), 프로필에서 역할 전환. `/auth/active-role`.
+- **발견 경로**: 게스트 랜딩 + 로그인 유저 프로필에 "기자단/스폰서" CTA.
+- **이메일 알림(Resend)**: 매일 8시 발행 + 시리즈 완료 메일 자동 발송(작동 확인). CTA 골드 버튼. RESEND_API_KEY는 Render에 설정됨.
+- **토큰 실측 기록**: 신문마다 `input_tokens/output_tokens` 저장. 실측 ~30원/편, 7일 시리즈 ~210원/유저.
+- 의뢰 폼 모바일 폭 고정, 하단 탭바 정리, Magic Link 인증 통일.
+
+### ⏳ 대기 — CEO 액션 필요
+- **결제 연동 (블로커=키)**: 전략 = 국내 Portone 간편결제(카카오/네이버/토스) + 해외 Stripe. **백엔드는 둘 다 준비됨**(Portone 검증 로직 + Stripe 코드, 키 없으면 비활성). CEO가 **Portone Store ID·API Secret·채널키(3)** + **Stripe 키**를 Render/Vercel env에 넣으면 → CTO가 프론트 결제 UI 붙이고 테스트모드 검증. (셋업 가이드: 아래 6-27 항목)
+- **테스트 데이터 정리**: 프로덕션에 테스트 계정/주문 다수(`@example.com`, `+dreamtest`, `+goldtest`) → `/stats`·비용데이터 오염. 정리 승인 대기.
+
+### 🔜 다음 후보 (우선순위 CEO 결정)
+- 서비스 통계 대시보드(유저·꿈·스폰서·"같은 꿈" 카운터 — `/stats` 엔드포인트 있음, UI 미구현)
+- 비용 절감: 요약 콜 병합(~20% 즉시) / Batch API(볼륨 생기면)
+- first-value 미리보기("N명이 당신 분야를 꿈꿈"), waitlist
+
+### 🛠 핵심 인프라 (반드시 숙지 — 메모리에도 있음)
+- **배포**: 프론트 = `frontend/`에서 `vercel deploy --prod --yes` **수동**(git push로 자동배포 안 됨). 백엔드 = `git push psynetxten main` → Render 자동배포.
+- **DB = Supabase Postgres**(`qzlcpfrhwjgjafdafrva`). **스키마 변경은 Supabase MCP `apply_migration`으로 직접**(Render alembic은 신뢰성 없음 — 인증장애 이력). 마이그레이션은 멱등(IF NOT EXISTS)으로.
+- **git origin은 잘못된 repo**(powergild/DreamNews) → 항상 `psynetxten` 리모트로 push.
+- **AI 모델 = Claude Haiku 4.5**(3에이전트 전부). 배포 후 반드시 프로덕션 `/auth/me`+register로 인증 무결성 확인.
+
+---
+
 ## 💰 토큰 비용 분석 + 최적화 (2026-07-03)
 
 **실제 모델 = Claude Haiku 4.5** (메모리엔 Gemini라 돼 있었으나 실측·render.yaml 확인 → Claude. 메모리 최신화함). 단가 입력 $1 / 출력 $5 per 1M.
