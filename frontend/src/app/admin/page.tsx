@@ -69,6 +69,27 @@ interface OrderRow {
   created_at: string | null;
 }
 
+interface Finance {
+  revenue: { today: number; this_month: number; all_time: number; paid_orders: number };
+  cost_this_month: { token_cost_krw: number; infra_cost_krw: number; total_krw: number };
+  net_profit_this_month: number;
+  note: string;
+}
+
+interface InfraCostRow {
+  service: string;
+  monthly_cost_krw: number;
+  note: string | null;
+  updated_at: string;
+}
+
+const SERVICE_LABEL: Record<string, string> = {
+  render: "Render (백엔드)",
+  vercel: "Vercel (프론트)",
+  supabase: "Supabase (DB)",
+  resend: "Resend (이메일)",
+};
+
 const STATUS_LABEL: Record<string, string> = { new: "신규", contacted: "연락함", closed: "종료" };
 
 export default function AdminPage() {
@@ -81,6 +102,9 @@ export default function AdminPage() {
   const [orderQuery, setOrderQuery] = useState("");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [finance, setFinance] = useState<Finance | null>(null);
+  const [infraCosts, setInfraCosts] = useState<InfraCostRow[]>([]);
+  const [editingCost, setEditingCost] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -100,14 +124,18 @@ export default function AdminPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [ov, inq, sh] = await Promise.all([
+      const [ov, inq, sh, fin, costs] = await Promise.all([
         adminApi.overview(),
         adminApi.inquiries(),
         adminApi.scheduleHealth(),
+        adminApi.finance(),
+        adminApi.infraCosts(),
       ]);
       setOverview(ov.data);
       setInquiries(inq.data);
       setHealth(sh.data);
+      setFinance(fin.data);
+      setInfraCosts(costs.data);
     } catch {
       setError("데이터를 불러오지 못했습니다.");
     }
@@ -130,6 +158,18 @@ export default function AdminPage() {
   const handleOrderSearch = async () => {
     const res = await adminApi.searchOrders(orderQuery);
     setOrders(res.data);
+  };
+
+  const handleSaveInfraCost = async (service: string) => {
+    const raw = editingCost[service];
+    const value = Number(raw);
+    if (Number.isNaN(value) || value < 0) return;
+    await adminApi.updateInfraCost(service, value);
+    setInfraCosts((prev) =>
+      prev.map((c) => (c.service === service ? { ...c, monthly_cost_krw: value } : c))
+    );
+    const fin = await adminApi.finance();
+    setFinance(fin.data);
   };
 
   if (checking) {
@@ -184,6 +224,58 @@ export default function AdminPage() {
                 value={overview.new_inquiries}
                 accent={overview.new_inquiries > 0 ? "warn" : undefined}
               />
+            </div>
+          ) : (
+            <div className="skeleton h-24" />
+          )}
+        </section>
+
+        {/* 1.5. 매출 · 손익 */}
+        <section className="mb-8">
+          <h2 className="app-section-label mb-3">매출 · 손익</h2>
+          {finance ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label="이번 달 매출" value={finance.revenue.this_month} unit="원" />
+                <StatCard label="누적 매출" value={finance.revenue.all_time} unit="원" />
+                <StatCard label="이번 달 비용" value={finance.cost_this_month.total_krw} unit="원" />
+                <StatCard
+                  label="이번 달 순이익"
+                  value={finance.net_profit_this_month}
+                  unit="원"
+                  accent={finance.net_profit_this_month < 0 ? "danger" : finance.net_profit_this_month > 0 ? "ok" : undefined}
+                />
+              </div>
+              {finance.revenue.all_time === 0 && (
+                <p className="text-xs text-[#AEAAA5] px-1">{finance.note}</p>
+              )}
+              <div className="app-card p-4">
+                <p className="text-xs font-bold text-[#6B6869] mb-2">인프라 구독비 (월, 수동 입력)</p>
+                <div className="space-y-2.5">
+                  {infraCosts.map((c) => (
+                    <div key={c.service} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[#1A1A1A]">{SERVICE_LABEL[c.service] || c.service}</p>
+                        {c.note && <p className="text-[10px] text-[#AEAAA5] truncate">{c.note}</p>}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <input
+                          type="number"
+                          className="w-24 text-right text-sm border border-[#E0DFD8] rounded-lg px-2 py-1"
+                          defaultValue={c.monthly_cost_krw}
+                          onChange={(e) => setEditingCost((prev) => ({ ...prev, [c.service]: e.target.value }))}
+                        />
+                        <button
+                          onClick={() => handleSaveInfraCost(c.service)}
+                          className="text-xs font-bold text-white bg-[#1A1A1A] rounded-lg px-2.5 py-1.5"
+                        >
+                          저장
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="skeleton h-24" />
@@ -342,11 +434,13 @@ function StatCard({
   label,
   value,
   sub,
+  unit,
   accent,
 }: {
   label: string;
   value: number;
   sub?: string;
+  unit?: string;
   accent?: "ok" | "warn" | "danger";
 }) {
   const color =
@@ -354,7 +448,7 @@ function StatCard({
   return (
     <div className="app-card p-4">
       <p className="text-xs font-bold text-[#6B6869] mb-1">{label}</p>
-      <p className={`text-2xl font-headline font-bold ${color}`}>{value.toLocaleString()}</p>
+      <p className={`text-2xl font-headline font-bold ${color}`}>{value.toLocaleString()}{unit ? <span className="text-sm ml-0.5">{unit}</span> : ""}</p>
       {sub && <p className="text-[10px] text-[#AEAAA5] mt-0.5">{sub}</p>}
     </div>
   );

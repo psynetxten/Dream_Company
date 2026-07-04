@@ -10,6 +10,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.template import TemplateSeries, TemplateSlot, TemplateEpisode, TemplatePurchase
 from app.models.credit_transaction import CreditTransaction
 from app.models.partnership_inquiry import PartnershipInquiry
+from app.models.infra_cost import InfraCost
 
 __all__ = [
     "User",
@@ -28,4 +29,5 @@ __all__ = [
     "TemplatePurchase",
     "CreditTransaction",
     "PartnershipInquiry",
+    "InfraCost",
 ]

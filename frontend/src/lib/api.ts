@@ -212,6 +212,10 @@ export const adminApi = {
   scheduleHealth: () => api.get("/admin/schedule-health"),
   searchUsers: (q: string) => api.get("/admin/users", { params: { q } }),
   searchOrders: (q: string) => api.get("/admin/orders", { params: { q } }),
+  finance: () => api.get("/admin/finance"),
+  infraCosts: () => api.get("/admin/infra-costs"),
+  updateInfraCost: (service: string, monthly_cost_krw: number, note?: string) =>
+    api.patch(`/admin/infra-costs/${service}`, { monthly_cost_krw, note }),
 };
 
 export interface PartnershipInquiry {

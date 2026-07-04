@@ -10,6 +10,7 @@ from app.models.newspaper import Newspaper
 from app.models.sponsor import Sponsor
 from app.models.schedule import PublicationSchedule
 from app.models.partnership_inquiry import PartnershipInquiry
+from app.models.infra_cost import InfraCost
 from app.api.v1.auth import require_role
 
 router = APIRouter(
@@ -23,6 +24,17 @@ def _today_range():
     now = datetime.now(timezone.utc)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
+
+
+def _month_start():
+    now = datetime.now(timezone.utc)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _token_cost_krw(input_tokens: int, output_tokens: int) -> float:
+    # Haiku 4.5: 입력 $1 / 출력 $5 per 1M 토큰, 환율 1,400원 가정
+    usd = (input_tokens / 1_000_000) * 1.0 + (output_tokens / 1_000_000) * 5.0
+    return round(usd * 1400, 1)
 
 
 @router.get("/overview")
@@ -178,18 +190,102 @@ async def schedule_health(db: AsyncSession = Depends(get_db)):
     )
     in_week, out_week, count_week = tokens_week.one()
 
-    def cost_krw(input_tokens: int, output_tokens: int) -> float:
-        # Haiku 4.5: 입력 $1 / 출력 $5 per 1M 토큰, 환율 1,400원 가정
-        usd = (input_tokens / 1_000_000) * 1.0 + (output_tokens / 1_000_000) * 5.0
-        return round(usd * 1400, 1)
-
     return {
         "upcoming_pending": upcoming or 0,
         "overdue_pending": overdue or 0,
         "recent_failures": recent_failures,
-        "tokens_today": {"input": in_today, "output": out_today, "papers": count_today, "cost_krw": cost_krw(in_today, out_today)},
-        "tokens_week": {"input": in_week, "output": out_week, "papers": count_week, "cost_krw": cost_krw(in_week, out_week)},
+        "tokens_today": {"input": in_today, "output": out_today, "papers": count_today, "cost_krw": _token_cost_krw(in_today, out_today)},
+        "tokens_week": {"input": in_week, "output": out_week, "papers": count_week, "cost_krw": _token_cost_krw(in_week, out_week)},
     }
+
+
+@router.get("/finance")
+async def get_finance(db: AsyncSession = Depends(get_db)):
+    """매출·비용·순이익 — 결제 미연동 상태에서는 매출이 0으로 나오는 게 정상(대기 상태)."""
+    today_start, _ = _today_range()
+    month_start = _month_start()
+    now = datetime.now(timezone.utc)
+
+    async def revenue_since(since: datetime) -> int:
+        total = await db.scalar(
+            select(func.coalesce(func.sum(Order.amount_krw), 0)).where(
+                Order.payment_status == "paid", Order.created_at >= since
+            )
+        )
+        return total or 0
+
+    revenue_today = await revenue_since(today_start)
+    revenue_month = await revenue_since(month_start)
+    revenue_all = await db.scalar(
+        select(func.coalesce(func.sum(Order.amount_krw), 0)).where(Order.payment_status == "paid")
+    )
+    paid_order_count = await db.scalar(
+        select(func.count()).where(Order.payment_status == "paid")
+    )
+
+    tokens_month = await db.execute(
+        select(
+            func.coalesce(func.sum(Newspaper.input_tokens), 0),
+            func.coalesce(func.sum(Newspaper.output_tokens), 0),
+        ).where(Newspaper.created_at >= month_start)
+    )
+    in_month, out_month = tokens_month.one()
+    token_cost_month = _token_cost_krw(in_month, out_month)
+
+    infra_result = await db.execute(select(InfraCost))
+    infra_rows = infra_result.scalars().all()
+    infra_cost_month = sum(r.monthly_cost_krw for r in infra_rows)
+
+    total_cost_month = token_cost_month + infra_cost_month
+
+    return {
+        "revenue": {
+            "today": revenue_today,
+            "this_month": revenue_month,
+            "all_time": revenue_all or 0,
+            "paid_orders": paid_order_count or 0,
+        },
+        "cost_this_month": {
+            "token_cost_krw": token_cost_month,
+            "infra_cost_krw": infra_cost_month,
+            "total_krw": total_cost_month,
+        },
+        "net_profit_this_month": round(revenue_month - total_cost_month, 1),
+        "note": "결제 미연동 상태에서는 매출이 0으로 표시됩니다(정상). Portone/Stripe 연동 후 자동 반영됩니다.",
+    }
+
+
+@router.get("/infra-costs")
+async def list_infra_costs(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(InfraCost).order_by(InfraCost.service))
+    rows = result.scalars().all()
+    return [
+        {
+            "service": r.service,
+            "monthly_cost_krw": r.monthly_cost_krw,
+            "note": r.note,
+            "updated_at": r.updated_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+class InfraCostUpdate(BaseModel):
+    monthly_cost_krw: int
+    note: str | None = None
+
+
+@router.patch("/infra-costs/{service}")
+async def update_infra_cost(service: str, data: InfraCostUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(InfraCost).where(InfraCost.service == service))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="등록되지 않은 서비스입니다.")
+    row.monthly_cost_krw = data.monthly_cost_krw
+    if data.note is not None:
+        row.note = data.note
+    await db.flush()
+    return {"success": True}
 
 
 @router.get("/users")
