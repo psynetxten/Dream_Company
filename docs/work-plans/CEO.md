@@ -2,6 +2,36 @@
 
 ---
 
+## 🔄 진행 중 (2026-07-04) — 무료 서비스 런칭 최종 준비: 발행 안정성 + 스폰서/작가 모집
+
+**배경**: 결제 연동은 키 대기 중이라 보류. "무료로 서비스 실제 운영"을 위한 마지막 준비에 집중 — ①핵심 약속(매일 8시 발행)이 실제로 안 깨지는지, ②스폰서·작가를 모집할 채널이 있는지.
+
+### ✅ 완료 — 발행 안정성 (Render 무료 티어 슬립 대응)
+- **문제**: Render 무료/기본 티어는 유휴 시 슬립 → in-process APScheduler가 정각(08:00 KST)에 못 돔 → 그날 발행이 통째로 스킵될 위험.
+- **수정 1**: `daily_publish.py` 스케줄러에 `misfire_grace_time=3600`(1시간까지 놓친 실행 허용) + `coalesce=True` 추가.
+- **수정 2 (핵심)**: `POST /api/v1/cron/publish` 엔드포인트 신설(`cron.py`) — 외부에서 호출하면 배치를 즉시 실행, `scheduled_at <= now`인 모든 pending 스케줄을 멱등하게 처리(밀린 발행도 한번에 따라잡음). `X-Cron-Secret` 헤더로 보호.
+- **수정 3**: `.github/workflows/daily-publish-cron.yml` 신설 — GitHub Actions가 매일 23:00 UTC(=08:00 KST)에 위 엔드포인트를 호출. 요청 자체가 잠든 Render 서비스를 깨움. `workflow_dispatch`로 수동 실행도 가능.
+- **⏳ CEO 액션 1개 필요**: 아래 값을 **두 곳에** 등록해야 실제로 작동함(CTO가 대화창에서 실제 시크릿 값 전달함 — CEO.md에는 값 기재 안 함, git에 올라가는 파일이라 보안상 제외):
+  1. **Render** 백엔드 서비스 → Environment → `CRON_SECRET` = (전달받은 값)
+  2. **GitHub** `psynetxten/Dream_Company` repo → Settings → Secrets and variables → Actions → 2개 추가: `CRON_SECRET`(Render와 동일 값), `BACKEND_URL`(Render 백엔드 URL, 예: `https://dream-newspaper-backend.onrender.com`)
+  - 둘 다 설정 전까지는 기존 in-process 스케줄러만 동작(무해, 회귀 없음). 설정 후 GitHub Actions 탭에서 workflow_dispatch로 1회 수동 실행해 200 확인 권장.
+
+### ✅ 완료 — 스폰서 모집 인프라 (실제 자동 이메일 연결)
+- **신규 `/for-sponsors` 공개 페이지**: 로그인 없이 접근 가능한 스폰서 파트너십 소개 페이지(가치제안 3가지 + 문의 폼). 기존 `/sponsor/register`는 로그인부터 요구해 콜드 프로스펙트에게 진입장벽이었음 — 이제 랜딩 "스폰서 문의" 링크가 이 페이지로 연결됨.
+- **신규 백엔드 `POST /api/v1/partnership/inquiry`**: 인증 불필요. 문의 접수 시 ①운영진(CEO 이메일)에게 알림 메일 ②문의자에게 접수확인 메일을 **Resend로 실제 자동 발송**. 로컬 Docker/uvicorn으로 엔드포인트 end-to-end 검증(정상 응답 + 이메일 발송 로직 호출 확인, 프로덕션은 RESEND_API_KEY가 이미 Render에 있어 실제 발송됨).
+- 이미 계정이 있는 스폰서는 폼 하단 링크로 기존 `/sponsor/register`(슬롯 설정까지 가능)로 바로 이동 가능.
+- **참고**: 실제 기업 컨택 리스트로 콜드 이메일을 자동 발송하는 것은 이번 범위에서 제외(스팸/미승인 발송 리스크 + 실제 리스트 부재). 대신 CEO가 후보 기업에 `/for-sponsors` 링크를 직접 공유하면, 문의 접수부터는 100% 자동화됨.
+
+### 🔜 작가 모집 — 기존 인프라로 충분, 추가 채널은 CEO 판단 필요
+- 작가는 이미 셀프서브 가능(`/writer/apply`, Magic Link, 랜딩 CTA 존재 — 2026-06-26 완료분).
+- 추가 레버 후보(실행 안 함, 우선순위 확인 필요): 작가 커뮤니티(오픈채팅/카페) 홍보 문구, 크몽·오투잡 등 프리랜서 플랫폼 공고. 이건 CEO가 실제 계정으로 올려야 하는 영역이라 CTO가 텍스트 초안만 만들 수 있음 — 필요하면 요청.
+
+### 배포
+- 백엔드: `git push psynetxten main` (partnership.py, cron.py, daily_publish.py, config.py, email_service.py, router.py)
+- 프론트: `frontend/`에서 `vercel deploy --prod --yes` (for-sponsors 페이지, api.ts, TypingLanding.tsx)
+
+---
+
 ## 📌 현재 상태 스냅샷 (2026-07-03 기준 — 새 세션은 여기부터 읽기)
 
 > 아래 로그는 최신순. 이 스냅샷 하나로 전체 맥락 파악 가능. 세부는 각 날짜 항목·메모리 참조.

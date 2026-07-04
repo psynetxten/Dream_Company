@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     PUBLISH_HOUR: int = 8
     PUBLISH_MINUTE: int = 0
     PUBLISH_TIMEZONE: str = "Asia/Seoul"
+    # 외부 크론이 발행 배치를 깨워/트리거할 때 쓰는 공유 시크릿.
+    # Render 무료 티어는 유휴 시 슬립되어 8시 in-process 스케줄러가 안 도므로,
+    # GitHub Actions 크론이 매일 08:00 KST에 /api/v1/cron/publish 를 이 시크릿으로 호출한다.
+    CRON_SECRET: str = ""
 
     # ============================
     # Stripe 결제 (레거시)
@@ -116,6 +120,8 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "noreply@dreamnewspaper.com"
     FROM_NAME: str = "꿈신문사"
+    # 제휴 문의(스폰서/작가) 알림 수신 이메일 — CEO 확인용
+    ADMIN_NOTIFY_EMAIL: str = "junholee940930@gmail.com"
 
     # ============================
     # 소셜 로그인 (OAuth)

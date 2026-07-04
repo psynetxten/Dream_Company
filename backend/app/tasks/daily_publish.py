@@ -279,6 +279,10 @@ def setup_scheduler():
         id="daily_publication",
         replace_existing=True,
         max_instances=1,
+        # 프로세스가 정각에 바쁘거나 방금 깨어난 경우에도 최대 1시간까지는
+        # 놓친 실행을 따라잡는다(무료 티어 콜드스타트 대비).
+        misfire_grace_time=3600,
+        coalesce=True,
     )
 
     scheduler.start()

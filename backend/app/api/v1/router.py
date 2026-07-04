@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, orders, newspapers, payment, writer, sponsor, templates
+from app.api.v1 import auth, orders, newspapers, payment, writer, sponsor, templates, cron, partnership
 from app.api.v1.progress import router as progress_router
 from app.api.v1.stats import router as stats_router
 
@@ -14,3 +14,5 @@ router.include_router(sponsor.router)
 router.include_router(templates.router)
 router.include_router(progress_router)
 router.include_router(stats_router)
+router.include_router(cron.router)
+router.include_router(partnership.router)

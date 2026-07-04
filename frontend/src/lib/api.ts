@@ -199,6 +199,19 @@ export const sponsorApi = {
   purchaseSlot: (data: SlotCreate) => api.post("/sponsor/slots", data),
 };
 
+// 제휴 문의 (인증 불필요)
+export const partnershipApi = {
+  inquire: (data: PartnershipInquiry) => api.post("/partnership/inquiry", data),
+};
+
+export interface PartnershipInquiry {
+  company_name: string;
+  contact_name: string;
+  email: string;
+  phone?: string;
+  message?: string;
+}
+
 export interface SponsorCreate {
   company_name: string;
   industry?: string;

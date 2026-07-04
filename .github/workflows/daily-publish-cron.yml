@@ -1,0 +1,20 @@
+name: Daily Publish Cron
+
+on:
+  schedule:
+    # 매일 23:00 UTC = 08:00 KST — Render 무료 티어가 잠들어 있어도
+    # 이 요청이 서비스를 깨우고 밀린 발행분까지 따라잡는다(멱등).
+    - cron: "0 23 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  trigger-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call backend cron endpoint
+        run: |
+          curl -sf -X POST "${{ secrets.BACKEND_URL }}/api/v1/cron/publish" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120 \
+            --retry 3 \
+            --retry-delay 30

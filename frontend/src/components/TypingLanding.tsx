@@ -193,7 +193,7 @@ export default function TypingLanding() {
             <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", fontSize: "0.75rem", color: "#A89F8C" }}>
               <a href="/writer/apply" style={{ color: "#A89F8C", textDecoration: "none" }}>기자단 지원</a>
               <span style={{ opacity: 0.5 }}>·</span>
-              <a href="/sponsor/register" style={{ color: "#A89F8C", textDecoration: "none" }}>스폰서 문의</a>
+              <a href="/for-sponsors" style={{ color: "#A89F8C", textDecoration: "none" }}>스폰서 문의</a>
             </div>
           </div>
         )}
