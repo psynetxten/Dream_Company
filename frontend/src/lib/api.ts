@@ -204,6 +204,16 @@ export const partnershipApi = {
   inquire: (data: PartnershipInquiry) => api.post("/partnership/inquiry", data),
 };
 
+// 관리자 (admin role 전용)
+export const adminApi = {
+  overview: () => api.get("/admin/overview"),
+  inquiries: (status?: string) => api.get("/admin/inquiries", { params: status ? { status } : {} }),
+  updateInquiryStatus: (id: string, status: string) => api.patch(`/admin/inquiries/${id}`, { status }),
+  scheduleHealth: () => api.get("/admin/schedule-health"),
+  searchUsers: (q: string) => api.get("/admin/users", { params: { q } }),
+  searchOrders: (q: string) => api.get("/admin/orders", { params: { q } }),
+};
+
 export interface PartnershipInquiry {
   company_name: string;
   contact_name: string;

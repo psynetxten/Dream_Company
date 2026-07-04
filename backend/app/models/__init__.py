@@ -9,6 +9,7 @@ from app.models.notification import Notification
 from app.models.refresh_token import RefreshToken
 from app.models.template import TemplateSeries, TemplateSlot, TemplateEpisode, TemplatePurchase
 from app.models.credit_transaction import CreditTransaction
+from app.models.partnership_inquiry import PartnershipInquiry
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "TemplateEpisode",
     "TemplatePurchase",
     "CreditTransaction",
+    "PartnershipInquiry",
 ]

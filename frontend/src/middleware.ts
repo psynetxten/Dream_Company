@@ -15,12 +15,13 @@ import type { NextRequest } from "next/server";
 const ROLE_COOKIE = "dream_role";
 
 // 로그인이 필요한 경로 (prefix)
-const AUTH_REQUIRED = ["/dashboard", "/order", "/writer", "/sponsor"];
+const AUTH_REQUIRED = ["/dashboard", "/order", "/writer", "/sponsor", "/admin"];
 
 // 역할별 접근 제한
 const ROLE_GUARD: Record<string, string[]> = {
   "/writer": ["writer", "admin"],
   "/sponsor": ["sponsor", "admin"],
+  "/admin": ["admin"],
 };
 
 // 가입/온보딩 경로 — 인증만 되면 역할 무관하게 접근 허용
