@@ -224,15 +224,37 @@ async def process_single_schedule(
             )
 
 
+async def _process_schedule_in_own_session(
+    schedule_id,
+    orchestrator: EditorInChief,
+    semaphore: asyncio.Semaphore,
+):
+    """각 스케줄을 '독립 DB 세션'에서 처리한다.
+
+    ⚠️ 동시성 안전의 핵심: SQLAlchemy AsyncSession은 여러 코루틴이 동시에
+    사용하면 안 된다(`another operation is in progress`). 따라서 gather로
+    병렬 실행하는 각 작업은 각자 세션을 연다. 실패는 process_single_schedule
+    내부에서 스케줄 행에 기록되고, 세션은 정상 커밋된다(작업 간 격리).
+    """
+    async with get_db_session() as db:
+        result = await db.execute(
+            select(PublicationSchedule).where(PublicationSchedule.id == schedule_id)
+        )
+        schedule = result.scalar_one_or_none()
+        if not schedule:
+            return
+        await process_single_schedule(db, schedule, orchestrator, semaphore)
+
+
 async def daily_publication_job():
     """매일 8시 실행되는 발행 배치 작업"""
     logger.info("daily_publication_job_start")
 
+    # 1) pending 스케줄 ID만 짧게 조회 (조회용 세션은 바로 반납)
     async with get_db_session() as db:
-        # 오늘 발행 예정인 pending 스케줄 조회
         now = datetime.now(timezone.utc)
         result = await db.execute(
-            select(PublicationSchedule).where(
+            select(PublicationSchedule.id).where(
                 and_(
                     PublicationSchedule.status == "pending",
                     PublicationSchedule.scheduled_at <= now,
@@ -240,31 +262,31 @@ async def daily_publication_job():
                 )
             )
         )
-        pending_schedules = result.scalars().all()
+        schedule_ids = [row[0] for row in result.all()]
 
-        if not pending_schedules:
-            logger.info("daily_publication_no_pending")
-            return
+    if not schedule_ids:
+        logger.info("daily_publication_no_pending")
+        return
 
-        logger.info("daily_publication_processing", count=len(pending_schedules))
+    logger.info("daily_publication_processing", count=len(schedule_ids))
 
-        orchestrator = EditorInChief()
-        semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_GENERATIONS)
+    # 2) 각 스케줄을 독립 세션 + 세마포어(동시 상한)로 병렬 처리
+    orchestrator = EditorInChief()
+    semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_GENERATIONS)
 
-        tasks = [
-            process_single_schedule(db, schedule, orchestrator, semaphore)
-            for schedule in pending_schedules
-        ]
+    tasks = [
+        _process_schedule_in_own_session(sid, orchestrator, semaphore)
+        for sid in schedule_ids
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # 실패 카운트
-        failures = sum(1 for r in results if isinstance(r, Exception))
-        logger.info(
-            "daily_publication_job_done",
-            total=len(pending_schedules),
-            failures=failures,
-        )
+    # 실패 카운트
+    failures = sum(1 for r in results if isinstance(r, Exception))
+    logger.info(
+        "daily_publication_job_done",
+        total=len(schedule_ids),
+        failures=failures,
+    )
 
 
 def setup_scheduler():
