@@ -23,14 +23,18 @@ async def create_order(
     current_user: User = Depends(get_current_user),
 ):
     """꿈 의뢰 생성"""
-    # duration_days 검증
-    if data.duration_days not in [7, 14, 30]:
+    # duration_days 검증 (3일=무료 체험, 7/14/30=유료 시리즈)
+    if data.duration_days not in [3, 7, 14, 30]:
         from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="기간은 7일, 14일, 30일 중 선택해야 합니다.")
+        raise HTTPException(status_code=400, detail="기간은 3일, 7일, 14일, 30일 중 선택해야 합니다.")
 
-    # 무료 플랜은 7일만 허용
-    if data.payment_type == "free" and data.duration_days != 7:
-        raise HTTPException(status_code=400, detail="무료 플랜은 7일 시리즈만 이용 가능합니다.")
+    # 무료 플랜은 3일 체험만 허용
+    if data.payment_type == "free" and data.duration_days != 3:
+        raise HTTPException(status_code=400, detail="무료 플랜은 3일 체험 시리즈만 이용 가능합니다.")
+
+    # 유료(크레딧) 플랜은 3일 불가 — 7일 이상
+    if data.payment_type != "free" and data.duration_days == 3:
+        raise HTTPException(status_code=400, detail="3일 체험은 무료 플랜에서만 이용 가능합니다.")
 
     # 크레딧 플랜: 잔액 미리 확인
     if data.payment_type == "credits":

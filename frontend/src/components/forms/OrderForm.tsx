@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ordersApi, creditsApi, OrderCreate } from "@/lib/api";
 
 const DURATION_OPTIONS = [
-  { days: 7,  label: "7일",  credits: 7,  desc: "체험" },
+  { days: 7,  label: "7일",  credits: 7,  desc: "기본" },
   { days: 14, label: "14일", credits: 14, desc: "집중" },
   { days: 30, label: "30일", credits: 30, desc: "완성" },
 ] as const;
@@ -178,7 +178,7 @@ export default function OrderForm() {
     protagonist_name: "",
     target_role: "",
     target_company: "",
-    duration_days: 7,
+    duration_days: 3,
     future_year: 2030,
     payment_type: "free",
   });
@@ -344,7 +344,7 @@ export default function OrderForm() {
 
         {/* 무료 카드 */}
         <button type="button"
-          onClick={() => setForm({ ...form, payment_type: "free", duration_days: 7 })}
+          onClick={() => setForm({ ...form, payment_type: "free", duration_days: 3 })}
           style={{
             background: "#fff", border: isFree ? "2px solid #1A1A1A" : "1.5px solid #E0DFD8",
             borderRadius: 14, padding: "14px 16px", textAlign: "left", cursor: "pointer", width: "100%",
@@ -352,7 +352,7 @@ export default function OrderForm() {
           }}>
           <div>
             <span style={{ display: "inline-block", background: "#D4F1DE", color: "#1A6B35", fontSize: 10, fontWeight: "bold", padding: "2px 8px", borderRadius: 99, marginBottom: 4 }}>무료</span>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1A1A1A" }}>7일 체험 시리즈</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1A1A1A" }}>3일 체험 시리즈</p>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6B6869" }}>결제 없이 즉시 시작</p>
           </div>
           <Checkmark on={isFree} />
@@ -360,7 +360,7 @@ export default function OrderForm() {
 
         {/* 크레딧 카드 */}
         <button type="button"
-          onClick={() => setForm({ ...form, payment_type: "credits", duration_days: form.duration_days === 7 ? 14 : form.duration_days })}
+          onClick={() => setForm({ ...form, payment_type: "credits", duration_days: form.duration_days < 7 ? 7 : form.duration_days })}
           style={{
             background: "#fff", border: isCredits ? "2px solid #1A1A1A" : "1.5px solid #E0DFD8",
             borderRadius: 14, padding: "14px 16px", textAlign: "left", cursor: "pointer", width: "100%",

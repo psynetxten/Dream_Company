@@ -260,7 +260,7 @@ export interface OrderCreate {
   protagonist_name: string;
   target_role: string;
   target_company?: string;
-  duration_days: 7 | 14 | 30;
+  duration_days: 3 | 7 | 14 | 30;
   future_year?: number;
   payment_type: "subscription" | "one_time" | "free" | "credits";
 }

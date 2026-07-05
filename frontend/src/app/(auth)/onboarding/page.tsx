@@ -53,7 +53,7 @@ export default function OnboardingPage() {
           dream_description: dream.trim(),
           protagonist_name: name || "독자",
           target_role: dream.trim().slice(0, 200),
-          duration_days: 7,
+          duration_days: 3,
           payment_type: "free",
           future_year: 2027,
           supporting_people: [],

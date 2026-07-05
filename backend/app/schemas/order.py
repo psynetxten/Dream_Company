@@ -16,7 +16,7 @@ class OrderCreate(BaseModel):
     target_role: str = Field(..., min_length=1, max_length=200)
     target_company: Optional[str] = Field(None, max_length=200)
     supporting_people: List[SupportingPerson] = []
-    duration_days: int = Field(..., ge=7)  # 7 | 14 | 30
+    duration_days: int = Field(..., ge=3)  # 3(무료 체험) | 7 | 14 | 30
     series_theme: Optional[str] = Field(None, max_length=200)
     future_year: int = Field(2030, ge=2025, le=2100)
     payment_type: str = Field(..., pattern="^(subscription|one_time|free|credits)$")

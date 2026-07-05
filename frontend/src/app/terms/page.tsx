@@ -27,7 +27,7 @@ export default function TermsPage() {
           <p>서비스는 다음을 제공합니다.</p>
           <ul className="list-disc list-inside space-y-1 pl-2">
             <li>사용자가 제출한 꿈·목표를 기반으로 AI가 생성하는 미래 신문 콘텐츠</li>
-            <li>7일·14일·30일 시리즈 신문 구독 서비스</li>
+            <li>3일 체험 및 7일·14일·30일 시리즈 신문 구독 서비스</li>
             <li>매일 오전 8시(KST) 자동 발행 및 알림</li>
             <li>생성된 신문 열람·공유</li>
           </ul>
