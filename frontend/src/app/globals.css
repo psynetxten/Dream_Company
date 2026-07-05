@@ -107,14 +107,11 @@
     column-count: 1;
   }
 
+  /* 모든 문단의 첫 줄을 들여쓰기 (첫 문단 포함) */
   .news-body p {
     @apply mb-3;
     text-align: justify;
     text-indent: 1.5em;
-  }
-
-  .news-body p:first-child {
-    text-indent: 0;
   }
 
   /* 리드 문단 (초기 볼드) */
