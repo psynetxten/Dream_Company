@@ -101,18 +101,10 @@
     font-style: italic;
   }
 
-  /* 기사 본문 — 모바일: 단일 컬럼, 데스크탑: 2컬럼 */
+  /* 기사 본문 — 가독성 위해 항상 단일 컬럼 (2컬럼은 좁은 폭에서 가독성 저하) */
   .news-body {
     @apply text-base leading-relaxed;
     column-count: 1;
-    column-gap: 2rem;
-    column-rule: 1px solid var(--border-color);
-  }
-
-  @media (min-width: 768px) {
-    .news-body {
-      column-count: 2;
-    }
   }
 
   .news-body p {
