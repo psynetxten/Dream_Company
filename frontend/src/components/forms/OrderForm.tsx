@@ -27,6 +27,146 @@ function StepBar({ current, total }: { current: number; total: number }) {
   );
 }
 
+/* ── 공통 레이아웃 래퍼 ──
+   ⚠️ 이 컴포넌트들은 반드시 모듈 최상위에 둔다.
+   OrderForm 내부에 정의하면 매 렌더마다 새 컴포넌트 타입이 생성돼
+   입력창이 언마운트/리마운트 → 타이핑 중 포커스가 튕긴다. */
+function Screen({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      background: "#F4F3EE",
+      display: "flex",
+      justifyContent: "center",
+      overflow: "hidden",
+      zIndex: 10,
+    }}>
+      <div style={{
+        width: "100%",
+        maxWidth: 430,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── 공통 헤더 ── */
+function Header({ step: s, title, sub }: { step: number; title: React.ReactNode; sub?: string }) {
+  return (
+    <div style={{ padding: "14px 24px 0" }}>
+      <StepBar current={s} total={3} />
+      <p style={{ margin: "12px 0 2px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em" }}>
+        {s} / 3
+      </p>
+      <h1 style={{ margin: 0, fontSize: 22, fontWeight: "bold", color: "#1A1A1A", lineHeight: 1.25, fontFamily: "Georgia, serif" }}>
+        {title}
+      </h1>
+      {sub && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6B6869" }}>{sub}</p>}
+    </div>
+  );
+}
+
+/* ── 공통 하단 버튼 영역 ── */
+function Footer({ primary, primaryDisabled, onPrimary, onBack, hint, error, loading }: {
+  primary: React.ReactNode;
+  primaryDisabled?: boolean;
+  onPrimary: () => void;
+  onBack?: () => void;
+  hint?: string;
+  error?: string;
+  loading?: boolean;
+}) {
+  return (
+    <div style={{ padding: "10px 24px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {error && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#CC2200" }}>
+          {error}
+        </div>
+      )}
+      <button
+        onClick={onPrimary}
+        disabled={primaryDisabled}
+        style={{
+          background: primaryDisabled ? "#C8C6BF" : "#1A1A1A",
+          color: primaryDisabled ? "#8A8880" : "#F5F0E8",
+          border: "none",
+          borderRadius: 14,
+          padding: "15px 0",
+          fontSize: 15,
+          fontWeight: "bold",
+          cursor: primaryDisabled ? "not-allowed" : "pointer",
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        }}
+      >
+        {loading && (
+          <svg style={{ animation: "spin 1s linear infinite", width: 16, height: 16 }} viewBox="0 0 24 24" fill="none">
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/>
+            <path fill="currentColor" opacity=".75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+          </svg>
+        )}
+        {primary}
+      </button>
+      {onBack && (
+        <button onClick={onBack} style={{
+          background: "transparent", border: "none", color: "#6B6869",
+          fontSize: 13, padding: "6px 0", cursor: "pointer",
+        }}>
+          ← 이전
+        </button>
+      )}
+      {hint && <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: "#AEAAA5" }}>{hint}</p>}
+    </div>
+  );
+}
+
+/* ── STEP 2 입력 필드 ── */
+function Input({ label, value, onChange, placeholder, autoFocus }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean;
+}) {
+  return (
+    <div>
+      <p style={{ margin: "0 0 5px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em", textTransform: "uppercase" }}>{label}</p>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        style={{
+          width: "100%", border: "1.5px solid #E0DFD8", borderRadius: 12,
+          padding: "11px 14px", fontSize: 14, color: "#1A1A1A",
+          background: "#fff", outline: "none", boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
+/* ── STEP 3 체크마크 ── */
+function Checkmark({ on }: { on: boolean }) {
+  return (
+    <div style={{
+      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+      border: on ? "none" : "1.5px solid #E0DFD8",
+      background: on ? "#1A1A1A" : "transparent",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {on && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+    </div>
+  );
+}
+
 export default function OrderForm() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -80,98 +220,6 @@ export default function OrderForm() {
     }
   };
 
-  /* ── 공통 레이아웃 래퍼 ── */
-  const Screen = ({ children }: { children: React.ReactNode }) => (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      background: "#F4F3EE",
-      display: "flex",
-      justifyContent: "center",
-      overflow: "hidden",
-      zIndex: 10,
-    }}>
-      <div style={{
-        width: "100%",
-        maxWidth: 430,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}>
-        {children}
-      </div>
-    </div>
-  );
-
-  /* ── 공통 헤더 ── */
-  const Header = ({ step: s, title, sub }: { step: number; title: React.ReactNode; sub?: string }) => (
-    <div style={{ padding: "14px 24px 0" }}>
-      <StepBar current={s} total={3} />
-      <p style={{ margin: "12px 0 2px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em" }}>
-        {s} / 3
-      </p>
-      <h1 style={{ margin: 0, fontSize: 22, fontWeight: "bold", color: "#1A1A1A", lineHeight: 1.25, fontFamily: "Georgia, serif" }}>
-        {title}
-      </h1>
-      {sub && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6B6869" }}>{sub}</p>}
-    </div>
-  );
-
-  /* ── 공통 하단 버튼 영역 ── */
-  const Footer = ({ primary, primaryDisabled, onPrimary, onBack, hint }: {
-    primary: React.ReactNode;
-    primaryDisabled?: boolean;
-    onPrimary: () => void;
-    onBack?: () => void;
-    hint?: string;
-  }) => (
-    <div style={{ padding: "10px 24px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-      {error && (
-        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#CC2200" }}>
-          {error}
-        </div>
-      )}
-      <button
-        onClick={onPrimary}
-        disabled={primaryDisabled}
-        style={{
-          background: primaryDisabled ? "#C8C6BF" : "#1A1A1A",
-          color: primaryDisabled ? "#8A8880" : "#F5F0E8",
-          border: "none",
-          borderRadius: 14,
-          padding: "15px 0",
-          fontSize: 15,
-          fontWeight: "bold",
-          cursor: primaryDisabled ? "not-allowed" : "pointer",
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-        }}
-      >
-        {loading && (
-          <svg style={{ animation: "spin 1s linear infinite", width: 16, height: 16 }} viewBox="0 0 24 24" fill="none">
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/>
-            <path fill="currentColor" opacity=".75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-          </svg>
-        )}
-        {primary}
-      </button>
-      {onBack && (
-        <button onClick={onBack} style={{
-          background: "transparent", border: "none", color: "#6B6869",
-          fontSize: 13, padding: "6px 0", cursor: "pointer",
-        }}>
-          ← 이전
-        </button>
-      )}
-      {hint && <p style={{ margin: 0, textAlign: "center", fontSize: 11, color: "#AEAAA5" }}>{hint}</p>}
-    </div>
-  );
-
   /* ─────────── STEP 1 ─────────── */
   if (step === 1) {
     return (
@@ -211,6 +259,8 @@ export default function OrderForm() {
           primary="다음 →"
           primaryDisabled={!canNext1}
           onPrimary={() => setStep(2)}
+          error={error}
+          loading={loading}
         />
       </Screen>
     );
@@ -218,26 +268,6 @@ export default function OrderForm() {
 
   /* ─────────── STEP 2 ─────────── */
   if (step === 2) {
-    const Input = ({ label, value, onChange, placeholder, autoFocus }: {
-      label: string; value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean;
-    }) => (
-      <div>
-        <p style={{ margin: "0 0 5px", fontSize: 10, fontWeight: "bold", color: "#AEAAA5", letterSpacing: "0.2em", textTransform: "uppercase" }}>{label}</p>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          style={{
-            width: "100%", border: "1.5px solid #E0DFD8", borderRadius: 12,
-            padding: "11px 14px", fontSize: 14, color: "#1A1A1A",
-            background: "#fff", outline: "none", boxSizing: "border-box",
-          }}
-        />
-      </div>
-    );
-
     return (
       <Screen>
         <Header step={2} title={<>신문의 주인공은<br />누구인가요?</>} sub="기사에 실명으로 등장합니다" />
@@ -280,23 +310,14 @@ export default function OrderForm() {
           primaryDisabled={!canNext2}
           onPrimary={() => setStep(3)}
           onBack={() => setStep(1)}
+          error={error}
+          loading={loading}
         />
       </Screen>
     );
   }
 
   /* ─────────── STEP 3 ─────────── */
-  const Checkmark = ({ on }: { on: boolean }) => (
-    <div style={{
-      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-      border: on ? "none" : "1.5px solid #E0DFD8",
-      background: on ? "#1A1A1A" : "transparent",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      {on && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-    </div>
-  );
-
   const submitLabel = () => {
     if (loading) return "준비 중...";
     if (isFree) return "무료로 시작하기 🗞";
@@ -397,6 +418,8 @@ export default function OrderForm() {
         onPrimary={handleSubmit}
         onBack={() => setStep(2)}
         hint="제출 후 첫 신문이 곧 발행됩니다"
+        error={error}
+        loading={loading}
       />
     </Screen>
   );
