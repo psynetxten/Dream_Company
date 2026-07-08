@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.database import get_db
 from app.models.order import Order
 from app.models.newspaper import Newspaper
@@ -147,6 +147,20 @@ async def _process_order_background(order_id: str):
         if not order:
             return
 
+        # 꿈 동료 공간용 비식별 열망 한 줄 생성(이름·사적정보 제거). 실패해도 발행엔 무관.
+        if not order.public_aspiration:
+            try:
+                from app.services.dream_companions import generate_public_aspiration
+                order.public_aspiration = await generate_public_aspiration(
+                    target_role=order.target_role,
+                    dream_description=order.dream_description,
+                    future_year=order.future_year,
+                    protagonist_name=order.protagonist_name,
+                )
+                await db.flush()
+            except Exception:
+                pass
+
         order_dict = {
             "id": str(order.id),
             "protagonist_name": order.protagonist_name,
@@ -245,6 +259,72 @@ async def get_dream_stats(
     )
     count = result.scalar() or 0
     return {"count": count}
+
+
+@router.get("/dream-companions")
+async def get_dream_companions(role: str = "", db: AsyncSession = Depends(get_db)):
+    """같은 미래를 향한 사람들 — 비식별 열망 목록 + 인원. 인증 불필요.
+
+    개인정보 보호: 이름·원본 꿈 설명은 절대 반환하지 않는다. 저장된 비식별
+    열망 한 줄(public_aspiration)과 미래연도만 노출. 실데이터가 적으면 시드로 채운다.
+    """
+    from app.services.dream_companions import SEED_ASPIRATIONS
+
+    # 같은 분야(target_role) 인원 수
+    if role:
+        count = await db.scalar(
+            select(func.count(Order.id)).where(Order.target_role.ilike(f"%{role}%"))
+        ) or 0
+    else:
+        count = await db.scalar(select(func.count(Order.id))) or 0
+
+    # 실주문의 비식별 열망(최신순). 같은 분야 우선, 부족하면 전체에서 보충.
+    real: list[dict] = []
+    seen: set[str] = set()
+
+    async def _collect(q):
+        res = await db.execute(q)
+        for asp, year in res.all():
+            if asp and asp not in seen:
+                seen.add(asp)
+                real.append({"line": asp, "year": year})
+
+    if role:
+        await _collect(
+            select(Order.public_aspiration, Order.future_year)
+            .where(Order.target_role.ilike(f"%{role}%"), Order.public_aspiration.isnot(None))
+            .order_by(Order.created_at.desc())
+            .limit(5)
+        )
+    if len(real) < 5:
+        await _collect(
+            select(Order.public_aspiration, Order.future_year)
+            .where(Order.public_aspiration.isnot(None))
+            .order_by(Order.created_at.desc())
+            .limit(5)
+        )
+
+    # 시드로 5개까지 채움(실데이터 우선)
+    aspirations = real[:5]
+    for seed in SEED_ASPIRATIONS:
+        if len(aspirations) >= 5:
+            break
+        if seed["line"] not in seen:
+            seen.add(seed["line"])
+            aspirations.append(seed)
+
+    # 이번 주 신규(같은 분야)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    new_q = select(func.count(Order.id)).where(Order.created_at >= week_ago)
+    if role:
+        new_q = new_q.where(Order.target_role.ilike(f"%{role}%"))
+    new_this_week = await db.scalar(new_q) or 0
+
+    return {
+        "count": count,
+        "aspirations": aspirations,
+        "new_this_week": new_this_week,
+    }
 
 
 @router.get("/{order_id}", response_model=OrderResponse)

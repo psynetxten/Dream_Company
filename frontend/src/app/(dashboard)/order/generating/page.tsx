@@ -56,6 +56,11 @@ function GeneratingContent() {
   const [stage, setStage] = useState<StageName>("idle");
   const [sponsorCompany, setSponsorCompany] = useState<string | null>(null);
   const [dreamCount, setDreamCount] = useState<number | null>(null);
+  const [companions, setCompanions] = useState<{
+    count: number;
+    aspirations: { line: string; year: number }[];
+    new_this_week: number;
+  } | null>(null);
   const [showDreamCount, setShowDreamCount] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -68,12 +73,14 @@ function GeneratingContent() {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [completedLines.length, currentText]);
 
-  // 같은 꿈 인원 수 조회
+  // 같은 미래를 향한 사람들 — 인원 + 비식별 열망 목록 조회
   useEffect(() => {
-    if (!role) return;
-    fetch(`${apiUrl}/api/v1/orders/dream-stats?role=${encodeURIComponent(role)}`)
+    fetch(`${apiUrl}/api/v1/orders/dream-companions?role=${encodeURIComponent(role || "")}`)
       .then((r) => r.json())
-      .then((d) => setDreamCount(typeof d.count === "number" ? d.count : null))
+      .then((d) => {
+        setCompanions(d);
+        setDreamCount(typeof d.count === "number" ? d.count : null);
+      })
       .catch(() => {});
   }, [role, apiUrl]);
 
@@ -405,21 +412,49 @@ function GeneratingContent() {
           </div>
         )}
 
-        {/* 같은 꿈 인원 수 — sponsor 카드 다음에 등장 */}
-        {showDreamCount && dreamCount !== null && (
-          <p
+        {/* 같은 미래를 향한 사람들 — 꿈 동료 공간 */}
+        {showDreamCount && companions && (
+          <div
             style={{
-              margin: 0,
-              color: "#3A3A3A",
-              fontSize: 12,
-              textAlign: "center",
+              width: "100%",
+              maxWidth: 340,
+              margin: "0 auto",
+              padding: "16px 18px",
+              border: "1px solid #2A2A2A",
+              borderRadius: 12,
+              background: "#141414",
               animation: "fadeIn 0.6s ease",
             }}
           >
-            {dreamCount === 0
-              ? `🌟 ${role || "이 꿈"}의 첫 번째 의뢰입니다`
-              : `👥 같은 꿈을 키우고 있는 사람: ${dreamCount.toLocaleString()}명`}
-          </p>
+            <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.18em", color: "#6A6A6A" }}>
+              같은 미래를 향한 사람들
+            </p>
+            <p style={{ margin: "10px 0 0", fontSize: 15, lineHeight: 1.5, color: "#F5F0E8", fontFamily: "Georgia, serif" }}>
+              {companions.count <= 1
+                ? <>당신은 <span style={{ fontWeight: 700 }}>{role || "이 꿈"}</span>의<br />첫 번째 주인공입니다</>
+                : <>당신처럼 <span style={{ fontWeight: 700 }}>‘{role}’</span>을<br />꿈꾸는 사람 <span style={{ fontWeight: 700 }}>{companions.count.toLocaleString()}명</span></>}
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: "#8A8272" }}>
+              당신의 꿈은 혼자가 아닙니다.
+            </p>
+
+            {companions.aspirations?.length > 0 && (
+              <div style={{ marginTop: 14, borderTop: "1px solid #262626", paddingTop: 12, display: "flex", flexDirection: "column", gap: 9 }}>
+                {companions.aspirations.slice(0, 4).map((a, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 11, color: "#6A6A6A", minWidth: 34, fontWeight: 700, fontFamily: "Georgia, serif" }}>{a.year}</span>
+                    <span style={{ fontSize: 13, color: "#D8D2C4", fontFamily: "Georgia, serif" }}>{a.line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {companions.new_this_week > 0 && (
+              <p style={{ margin: "12px 0 0", fontSize: 11, color: "#6A6A6A" }}>
+                이번 주, <span style={{ color: "#D8D2C4", fontWeight: 700 }}>{companions.new_this_week}명</span>이 새로 꿈을 시작했어요.
+              </p>
+            )}
+          </div>
         )}
 
         {/* 진행 점 바 */}

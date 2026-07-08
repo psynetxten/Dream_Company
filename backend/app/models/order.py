@@ -30,6 +30,9 @@ class Order(Base):
     series_theme: Mapped[str | None] = mapped_column(String(200), nullable=True)
     future_year: Mapped[int] = mapped_column(Integer, nullable=False, default=2030)
 
+    # 꿈 동료 공간용 비식별 열망 한 줄 (이름·사적정보 없음)
+    public_aspiration: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # 결제 정보
     payment_type: Mapped[str] = mapped_column(
         String(20), nullable=False
