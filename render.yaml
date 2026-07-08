@@ -20,6 +20,11 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      # 외부 크론(GitHub Actions)이 /api/v1/cron/publish 호출 시 사용하는 시크릿.
+      # ⚠️ 반드시 GitHub repo Secrets의 CRON_SECRET과 '동일한 값'으로 설정해야
+      # 매일 08:00 발행이 작동한다(무료 티어 슬립 대비 핵심 경로).
+      - key: CRON_SECRET
+        sync: false
       # === 앱 설정 ===
       - key: ENVIRONMENT
         value: production
