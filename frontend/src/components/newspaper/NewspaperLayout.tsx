@@ -109,21 +109,19 @@ export default function NewspaperLayout({
             마스트헤드 (신문 상단 헤더)
             ============================ */}
         <header className="newspaper-masthead px-3 sm:px-6">
-          <div className="newspaper-date-line text-xs mb-2">
-            <span>VOL. 1, NO. {newspaper.episode_number}</span>
-            <span className="font-bold tracking-widest">꿈신문사</span>
-            <span>DREAM NEWSPAPER</span>
-          </div>
           <h1 className="newspaper-title">꿈신문사</h1>
-          <p className="text-sm text-ink-muted mt-1 font-medium tracking-widest">
-            DREAM NEWSPAPER — 당신의 꿈이 이루어진 날
+          <p className="text-[10px] sm:text-xs text-ink-muted mt-1.5 tracking-[0.35em] uppercase">
+            Dream Newspaper
           </p>
-          <div className="newspaper-date-line mt-2">
-            <span>발행인: 꿈신문사 기자단</span>
-            <span className="font-bold text-base">
+          <p className="text-sm sm:text-base text-ink-muted mt-1 font-serif italic">
+            당신의 꿈이 이루어진 날
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-2.5 mt-4 pt-2.5 border-t border-ink">
+            <span className="font-bold text-sm sm:text-base text-ink">
               {newspaper.future_date_label || newspaper.future_date}
             </span>
-            <span>{newspaper.episode_number}편 / 연재 중</span>
+            <span className="text-ink-muted">·</span>
+            <span className="text-xs sm:text-sm text-ink-muted">제{newspaper.episode_number}호</span>
           </div>
         </header>
 
