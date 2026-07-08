@@ -99,11 +99,22 @@ function UserHome() {
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState<StreakData>({ days: 0, lastActive: null, bestStreak: 0, isActiveToday: false });
   const [stats, setStats] = useState<{ user_count: number; newspaper_count: number; sponsor_count: number } | null>(null);
+  const [companionCount, setCompanionCount] = useState<number | null>(null);
+  const [companionRole, setCompanionRole] = useState<string>("");
 
   useEffect(() => {
     const s = recordActivity();
     setStreak(s);
-    ordersApi.list().then((r) => setOrders(r.data)).catch(() => {}).finally(() => setLoading(false));
+    ordersApi.list().then((r) => {
+      const list: Order[] = r.data || [];
+      setOrders(list);
+      const role = list[0]?.target_role || "";
+      setCompanionRole(role);
+      fetch(`${getApiBaseUrl()}/api/v1/orders/dream-companions?role=${encodeURIComponent(role)}`)
+        .then((res) => res.json())
+        .then((d) => setCompanionCount(typeof d.count === "number" ? d.count : null))
+        .catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
     fetch(`${getApiBaseUrl()}/api/v1/stats`).then((r) => r.json()).then(setStats).catch(() => {});
   }, []);
 
@@ -123,6 +134,23 @@ function UserHome() {
       />
 
       <div className="pt-safe-header pb-safe-nav px-4 space-y-6 max-w-lg mx-auto">
+
+        {/* 꿈 동료 — 상단 즉시 노출, 탭하면 전용 공간으로 */}
+        {companionCount !== null && (
+          <Link href="/companions" className="block pt-4">
+            <div className="app-card app-card-tap px-4 py-3.5 flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] text-[#A89F8C] tracking-[0.14em]">같은 미래를 향한 사람들</p>
+                <p className="text-[15px] text-[#1A1A1A] font-headline mt-1 truncate">
+                  {companionCount <= 1
+                    ? <>당신은 <span className="font-bold">{companionRole || "이 꿈"}</span>의 첫 주인공</>
+                    : <>나와 같은 꿈 <span className="font-bold">{companionCount.toLocaleString()}명</span>이 함께</>}
+                </p>
+              </div>
+              <span className="text-[#A89F8C] text-lg shrink-0 ml-2">→</span>
+            </div>
+          </Link>
+        )}
 
         {/* 커뮤니티 통계 */}
         {stats && (
