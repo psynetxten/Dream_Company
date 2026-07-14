@@ -4,6 +4,7 @@ import asyncio
 from functools import partial
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from datetime import timedelta, datetime, timezone
 from app.database import get_db
 from app.models.user import User
@@ -92,14 +93,29 @@ async def get_current_user(
             email=email,
             full_name=full_name,
             role="user",
+            roles=["user"],
             oauth_provider=provider if provider != "email" else None,
-            oauth_provider_id=supabase_user.id,
+            # supabase uid = JWT sub = user_id. (이전엔 supabase_user.id를 참조했는데
+            # 로컬 JWT 검증 경로에선 supabase_user가 정의되지 않아 신규 유저마다 NameError→500)
+            oauth_provider_id=str(user_id),
             is_active=True,
             is_verified=True,
         )
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
+        try:
+            await db.commit()
+            await db.refresh(user)
+        except IntegrityError:
+            # 동시 첫 요청 경쟁(같은 신규 유저의 병렬 요청) 또는 이미 존재하는 행 →
+            # 롤백 후 재조회. 500 대신 정상 유저 반환(멱등).
+            await db.rollback()
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if user is None and email:
+                result = await db.execute(select(User).where(User.email == email))
+                user = result.scalar_one_or_none()
+            if user is None:
+                raise_unauthorized("User provisioning failed")
 
     if not user.is_active:
         raise_unauthorized("User is inactive")
