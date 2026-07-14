@@ -323,7 +323,7 @@ function GeneratingContent() {
             }}
           >
             {stage === "idle" && completedLines.length === 0 && !currentText && (
-              <span style={{ color: "#333" }}>
+              <span style={{ color: "#9A968C" }}>
                 편집국에 연결하는 중...<span className="cursor">|</span>
               </span>
             )}
@@ -405,7 +405,7 @@ function GeneratingContent() {
                 borderTop: "1px solid #2A2A2A",
               }}
             >
-              <p style={{ margin: 0, color: "#3A3A3A", fontSize: 10, lineHeight: 1.5 }}>
+              <p style={{ margin: 0, color: "#8A8880", fontSize: 10, lineHeight: 1.5 }}>
                 협찬이 확정되면 기사 안에 자연스럽게 등장합니다 — 독자에게 광고처럼 느껴지지 않습니다
               </p>
             </div>
@@ -502,7 +502,7 @@ function GeneratingContent() {
         )}
 
         {stage !== "done" && (
-          <p style={{ color: "#2A2A2A", fontSize: 11, margin: 0 }}>
+          <p style={{ color: "#8A8880", fontSize: 11, margin: 0 }}>
             보통 1~2분 소요됩니다
           </p>
         )}
