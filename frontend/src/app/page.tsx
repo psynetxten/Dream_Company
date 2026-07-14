@@ -98,7 +98,6 @@ function UserHome() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState<StreakData>({ days: 0, lastActive: null, bestStreak: 0, isActiveToday: false });
-  const [stats, setStats] = useState<{ user_count: number; newspaper_count: number; sponsor_count: number } | null>(null);
   const [companionCount, setCompanionCount] = useState<number | null>(null);
   const [companionRole, setCompanionRole] = useState<string>("");
 
@@ -115,7 +114,6 @@ function UserHome() {
         .then((d) => setCompanionCount(typeof d.count === "number" ? d.count : null))
         .catch(() => {});
     }).catch(() => {}).finally(() => setLoading(false));
-    fetch(`${getApiBaseUrl()}/api/v1/stats`).then((r) => r.json()).then(setStats).catch(() => {});
   }, []);
 
   const activeOrders = orders.filter((o) => o.status === "active");
@@ -152,32 +150,6 @@ function UserHome() {
           </Link>
         )}
 
-        {/* 커뮤니티 통계 */}
-        {stats && (
-          <div className="pt-4">
-            <div className="app-card px-4 py-4">
-              <p className="text-xs text-[#AEAAA5] font-medium mb-3 tracking-wide">지금 꿈신문사에서는</p>
-              <div className="grid grid-cols-3 gap-0 divide-x divide-[#E0DFD8]">
-                <div className="text-center px-2">
-                  <p className="font-bold text-[#1A1A1A] text-lg leading-tight">
-                    {stats.user_count >= 1000 ? `${(stats.user_count / 1000).toFixed(1)}천` : stats.user_count}
-                  </p>
-                  <p className="text-[10px] text-[#AEAAA5] mt-0.5 leading-tight">같은 꿈을<br/>꾸는 사람들</p>
-                </div>
-                <div className="text-center px-2">
-                  <p className="font-bold text-[#1A1A1A] text-lg leading-tight">
-                    {stats.newspaper_count >= 1000 ? `${(stats.newspaper_count / 1000).toFixed(1)}천` : stats.newspaper_count}
-                  </p>
-                  <p className="text-[10px] text-[#AEAAA5] mt-0.5 leading-tight">발행된<br/>미래 신문</p>
-                </div>
-                <div className="text-center px-2">
-                  <p className="font-bold text-[#1A1A1A] text-lg leading-tight">{stats.sponsor_count}</p>
-                  <p className="text-[10px] text-[#AEAAA5] mt-0.5 leading-tight">함께하는<br/>파트너 기업</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 스트릭 배너 */}
         {streak.days > 0 && (
