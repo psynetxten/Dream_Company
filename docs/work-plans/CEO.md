@@ -2,6 +2,22 @@
 
 ---
 
+## 🔴→✅ 긴급수정 (2026-07-14) — 신규 유저 "무료로 시작하기" 500 에러
+
+**증상**: CEO가 무료 의뢰 시 `POST /orders`에서 500 + CORS 에러 + 타임아웃. (CORS·타임아웃은 증상일 뿐 — 500 응답은 CORS 미들웨어를 우회해서 브라우저가 CORS 에러로 표시함.)
+
+**진단 과정**: CORS/엔드포인트/DB 전부 정상 확인 → 새 테스트 계정으로 `POST /orders` 재현하니 **201 성공**(코드 자체는 멀쩡) → postgres 로그의 `users_email_key` 중복키 + "오늘 카카오 로그인했으나 public.users 행이 없는 계정(이준호, email=null)" 발견.
+
+**진짜 원인 (2가지 버그, `auth.py` get_current_user)**:
+1. **NameError**: 신규 유저 public 행 지연생성 코드가 `supabase_user.id`를 참조하는데, `SUPABASE_JWT_SECRET`으로 로컬 JWT 검증하는 빠른 경로에선 `supabase_user`가 **정의된 적 없음** → 처음 로그인하는 유저(특히 email 없는 카카오)마다 NameError→500, 게다가 커밋 전에 터져서 **행이 영영 안 생겨 영구 500**. 기존 유저는 행이 있어 이 분기를 안 타서 멀쩡 → 그래서 "신규 유저만" 터짐.
+2. **동시성 경쟁**: 신규 유저의 병렬 첫 요청들이 동시에 INSERT → 중복키 충돌 → 지는 요청 500.
+
+**수정 (배포·검증 완료)**: `supabase_user.id`→`str(user_id)`(JWT sub, 두 경로 모두 정의됨), INSERT를 try/except IntegrityError로 감싸 롤백+재조회(멱등), `roles=["user"]` 세팅. 검증: public 행 없는 유저의 `/auth/me`가 500→**200**으로 정상 행 생성 확인. CEO 카카오 계정(7d5343c7)은 즉시 unblock 위해 public 행 수동 생성함.
+
+**교훈**: 카카오 로그인은 email이 null일 수 있고, public.users 행은 첫 백엔드 호출 때 지연생성됨 — 이 경로가 신규 유저 전체의 관문이라 반드시 견고해야 함. [[project_kakao_user_provisioning]] 참고.
+
+---
+
 ## 🔁 SNS 운영 표준 절차 (2026-07-12 확정 — 매 세션 반복·복기·업그레이드)
 
 **CEO 지시**: "오늘 한 과정들을 계속 반복하고 복기하고 업그레이드." 다음 세션부터 이 루프를 기본으로 이어간다.
