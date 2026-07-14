@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from app.database import get_db
 from app.models.order import Order
 from app.models.newspaper import Newspaper
@@ -119,12 +120,30 @@ async def start_order(
         )
         db.add(tx)
 
-    # 상태 업데이트
+    # 상태 업데이트 + 발행 스케줄을 '동기적으로' 생성 후 즉시 커밋.
+    # 스케줄은 순수 날짜 계산이라 AI가 필요 없다. 이렇게 확정해두면 백그라운드 AI 생성이
+    # 실패/지연돼도 주문은 유효한 active 상태 + 스케줄로 남아 매일 8시 cron이 발행을 잇는다.
+    # ⚠️ 왜 여기서 명시적 commit 하나: FastAPI는 yield 의존성(get_db)의 커밋을 백그라운드
+    # 태스크 '이후'로 미룬다. 예전엔 status 변경/스케줄 생성을 백그라운드에 뒀는데, 그 안의
+    # AI 호출이 멈추면 커밋까지 막혀 주문이 draft에 영구히 갇혔다(2026-07-14 장애 원인).
     order.status = "active"
     order.starts_at = datetime.now(timezone.utc)
-    await db.flush()
 
-    # 백그라운드: 오케스트레이터 실행 + 발행 스케줄 DB 저장
+    tz = ZoneInfo(order.timezone or "Asia/Seoul")
+    publish_hour = order.publish_time.hour if order.publish_time else 8
+    start_date = datetime.now(tz).replace(
+        hour=publish_hour, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+    for i in range(order.duration_days):
+        db.add(PublicationSchedule(
+            order_id=order.id,
+            episode_number=i + 1,
+            scheduled_at=start_date + timedelta(days=i),
+            status="pending",
+        ))
+    await db.commit()
+
+    # 백그라운드(best-effort): 첫 화 즉시 생성. 실패해도 위 상태/스케줄은 이미 확정됨.
     background_tasks.add_task(_process_order_background, str(order.id))
 
     return OrderStartResponse(
@@ -137,9 +156,27 @@ async def start_order(
 
 
 async def _process_order_background(order_id: str):
-    """백그라운드: 오케스트레이터 실행 + 스케줄 DB 저장"""
+    """백그라운드(best-effort): 첫 화 즉시 생성 + 비식별 열망 한 줄.
+
+    스케줄과 active 상태는 start_order에서 이미 동기 확정됨. 여기서 실패/지연해도
+    주문은 유효하며 나머지 화는 매일 8시 cron이 발행한다. AI 호출이 무한정 멈추는 것을
+    막기 위해 전체를 하드 타임아웃으로 감싼다.
+    """
+    import asyncio as _asyncio
+    try:
+        await _asyncio.wait_for(_generate_first_episode(order_id), timeout=180)
+    except Exception as e:
+        import structlog
+        structlog.get_logger().warning(
+            "first_episode_generation_failed", order_id=order_id, error=str(e)
+        )
+
+
+async def _generate_first_episode(order_id: str):
     from app.database import get_db_session
     from app.agents.editor_in_chief.agent import EditorInChief
+    from app.tasks.daily_publish import process_single_schedule
+    import asyncio as _asyncio
 
     async with get_db_session() as db:
         result = await db.execute(select(Order).where(Order.id == order_id))
@@ -147,7 +184,7 @@ async def _process_order_background(order_id: str):
         if not order:
             return
 
-        # 꿈 동료 공간용 비식별 열망 한 줄 생성(이름·사적정보 제거). 실패해도 발행엔 무관.
+        # 꿈 동료 공간용 비식별 열망 한 줄(이름·사적정보 제거). 실패해도 발행엔 무관.
         if not order.public_aspiration:
             try:
                 from app.services.dream_companions import generate_public_aspiration
@@ -161,54 +198,18 @@ async def _process_order_background(order_id: str):
             except Exception:
                 pass
 
-        order_dict = {
-            "id": str(order.id),
-            "protagonist_name": order.protagonist_name,
-            "dream_description": order.dream_description,
-            "target_role": order.target_role,
-            "target_company": order.target_company,
-            "duration_days": order.duration_days,
-            "future_year": order.future_year,
-            "timezone": order.timezone,
-            "publish_time": str(order.publish_time),
-            "writer_type": order.writer_type,
-            "payment_type": order.payment_type,
-        }
-
-        orchestrator = EditorInChief()
-
-        result_data = await orchestrator.process_new_order(order_dict)
-
-        # 스케줄 DB 저장
-        for item in result_data["schedule"]:
-            from datetime import datetime
-            scheduled_at = datetime.fromisoformat(item["scheduled_at"])
-            schedule = PublicationSchedule(
-                order_id=order.id,
-                episode_number=item["episode"],
-                scheduled_at=scheduled_at,
-                status="pending",
-            )
-            db.add(schedule)
-
-        await db.flush()
-
-        # 첫 번째 에피소드 즉시 생성 (무료/크레딧/유료 모두 — 시작 직후 바로 1화 제공)
-        # 이 함수는 정당한 시작(무료/크레딧 start 또는 결제 검증 완료) 후에만 호출됨.
-        if True:
-            from app.tasks.daily_publish import process_single_schedule
-            import asyncio as _asyncio
-
-            first_result = await db.execute(
-                select(PublicationSchedule)
-                .where(PublicationSchedule.order_id == order.id)
-                .order_by(PublicationSchedule.episode_number)
-                .limit(1)
-            )
-            first_schedule = first_result.scalar_one_or_none()
-            if first_schedule and first_schedule.status == "pending":
-                sem = _asyncio.Semaphore(1)
-                await process_single_schedule(db, first_schedule, orchestrator, sem)
+        # 첫 번째 에피소드 즉시 생성 (스케줄은 start_order에서 이미 생성됨)
+        first_result = await db.execute(
+            select(PublicationSchedule)
+            .where(PublicationSchedule.order_id == order.id)
+            .order_by(PublicationSchedule.episode_number)
+            .limit(1)
+        )
+        first_schedule = first_result.scalar_one_or_none()
+        if first_schedule and first_schedule.status == "pending":
+            orchestrator = EditorInChief()
+            sem = _asyncio.Semaphore(1)
+            await process_single_schedule(db, first_schedule, orchestrator, sem)
 
 
 @router.get("", response_model=list[OrderResponse])
