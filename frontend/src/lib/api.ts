@@ -204,6 +204,12 @@ export const partnershipApi = {
   inquire: (data: PartnershipInquiry) => api.post("/partnership/inquiry", data),
 };
 
+// 미래 헤드라인 생성기 (공개 — 홍보 후크)
+export const headlineApi = {
+  generate: (name: string, dream: string) =>
+    api.post("/headline/generate", { name, dream }),
+};
+
 // 관리자 (admin role 전용)
 export const adminApi = {
   overview: () => api.get("/admin/overview"),

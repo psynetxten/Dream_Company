@@ -38,7 +38,7 @@ export default function ForSponsorsPage() {
             브랜드를<br />누군가의 미래에
           </h1>
           <p className="text-sm text-[#6B6869] mt-3 leading-relaxed">
-            꿈신문사는 사용자가 되고 싶은 미래를 1인칭 신문으로 매일 배달합니다.
+            꿈신문사는 사용자가 되고 싶은 미래를 신문 기사로 매일 배달합니다.
             그 신문 안에 귀사의 브랜드가 광고가 아니라, 그 미래의 일부로 자연스럽게 등장합니다.
           </p>
         </div>
